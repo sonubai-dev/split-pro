@@ -8,8 +8,9 @@ import {
   Sliders,
   FileArchive,
   ChevronRight,
-  Scissors,
   Lock,
+  Scissors,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -29,7 +30,7 @@ const FAQS = [
   },
   {
     q: 'Can I set custom split lines manually instead of equal grids?',
-    a: 'Yes! PrecisionSplit includes a Custom Split mode with draggable vertical and horizontal split lines, exact pixel coordinate readouts, and snap alignments.',
+    a: 'Yes! Split Pro includes a Custom Split mode with draggable vertical and horizontal split lines, exact pixel coordinate readouts, and snap alignments.',
   },
   {
     q: 'How large of an image can I split?',
@@ -85,11 +86,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="text-center max-w-3xl mx-auto mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded text-xs font-mono font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40 mb-6">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>PRECISION IMAGE SLICING ENGINE</span>
+            <span>SPLIT PRO IMAGE SLICING ENGINE</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-gray-900 dark:text-white leading-[1.15] mb-6">
-            Split Images With <span className="text-blue-600 dark:text-blue-500">Precision</span>
+            Split Images With <span className="text-blue-600 dark:text-blue-500">Split Pro</span>
           </h1>
 
           <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400 leading-relaxed">
@@ -171,7 +172,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-3">
-              How Precision Slicing Works
+              How Split Pro Slicing Works
             </h2>
             <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
               Three seamless steps from a single high-resolution image to production-ready sliced panels.
@@ -346,19 +347,71 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 border-t border-gray-200 dark:border-[#1F2937] text-xs text-gray-500 dark:text-gray-400 font-mono bg-white dark:bg-transparent">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Scissors className="w-4 h-4 text-blue-600 dark:text-blue-500" />
-            <span className="font-semibold text-gray-900 dark:text-white">PrecisionSplit</span>
-            <span className="text-gray-400 dark:text-gray-500">— LOSSLESS IMAGE SLICING ENGINE</span>
+      {/* Split Pro Tool Footer */}
+      <footer
+        id="app-footer"
+        className="mt-16 border-t border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0D1117] text-gray-600 dark:text-gray-400 py-12 px-4 sm:px-6 transition-colors"
+      >
+        <div className="max-w-7xl mx-auto flex flex-col gap-8">
+          {/* Top Row: Brand & Security Badges */}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div id="footer-brand" className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-white text-base shadow-sm shadow-blue-900/30">
+                S
+              </div>
+              <div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-lg font-bold tracking-tight text-gray-900 dark:text-white">
+                    SPLIT<span className="text-blue-600 dark:text-blue-500 underline underline-offset-4 decoration-2">PRO</span>
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+                    Studio
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Lossless in-browser image slicing & panel dividing engine
+                </p>
+              </div>
+            </div>
+
+            {/* Feature Highlights */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-50 dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] text-gray-700 dark:text-gray-300">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                <span>100% Client-Side</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-50 dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] text-gray-700 dark:text-gray-300">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+                <span>Zero Server Lag</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-50 dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] text-gray-700 dark:text-gray-300">
+                <Scissors className="w-3.5 h-3.5 text-blue-500" />
+                <span>Lossless 4K/8K Slices</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-6 text-gray-500 dark:text-gray-400">
-            <span>CLIENT-SIDE ENGINE</span>
-            <span>NO CLOUD UPLOAD</span>
-            <span>HTML5 CANVAS 2D</span>
+          {/* Bottom Row: Quick Actions */}
+          <div className="pt-6 border-t border-gray-100 dark:border-[#21262D] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-gray-500 dark:text-gray-400">
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                Upload File
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={onPasteRequested}
+                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                Paste Clipboard
+              </button>
+              <span>•</span>
+              <span>PNG / JPG / WebP / PDF / ZIP</span>
+            </div>
           </div>
         </div>
       </footer>
