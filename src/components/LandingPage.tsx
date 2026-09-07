@@ -9,12 +9,11 @@ import {
   FileArchive,
   ChevronRight,
   Lock,
-  Scissors,
-  ShieldCheck,
 } from 'lucide-react';
 
 interface LandingPageProps {
   onImageSelected: (file: File) => void;
+  onImagesSelected?: (files: File[]) => void;
   onSampleSelected?: (url: string, name: string) => void;
   onPasteRequested: () => void;
 }
@@ -44,6 +43,7 @@ const FAQS = [
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onImageSelected,
+  onImagesSelected,
   onSampleSelected,
   onPasteRequested,
 }) => {
@@ -66,13 +66,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onImageSelected(e.dataTransfer.files[0]);
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 1 && onImagesSelected) {
+        onImagesSelected(files);
+      } else {
+        onImageSelected(files[0]);
+      }
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onImageSelected(e.target.files[0]);
+      const files = Array.from(e.target.files);
+      if (files.length > 1 && onImagesSelected) {
+        onImagesSelected(files);
+      } else {
+        onImageSelected(files[0]);
+      }
     }
   };
 
@@ -116,7 +126,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/png, image/jpeg, image/webp, image/jpg"
+              accept="image/png, image/jpeg, image/webp, image/jpg, image/avif"
+              multiple
               className="hidden"
               onChange={handleFileChange}
             />
@@ -126,10 +137,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-              Drop your image here
+              Drop image(s) here or browse
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 max-w-sm mb-6">
-              Drag & drop any high-resolution image, browse your files, or paste directly from your clipboard.
+              Drag & drop single or multiple images. All images will be sliced with matching settings and can be exported as a single ZIP.
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-xs">
@@ -141,7 +152,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 }}
                 className="flex-1 min-w-[120px] px-4 py-2.5 rounded text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all active:scale-95"
               >
-                Upload Image
+                Upload Image(s)
               </button>
 
               <button
@@ -158,7 +169,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             <div className="mt-8 pt-6 border-t border-gray-200 dark:border-[#1F2937] flex items-center justify-between w-full text-xs text-gray-500 dark:text-gray-400 font-mono">
-              <span>FORMATS: JPG, PNG, WEBP</span>
+              <span>FORMATS: JPG, PNG, WEBP, AVIF • BATCH SUPPORTED</span>
               <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
                 <Lock className="w-3 h-3" /> 100% PRIVATE & LOCAL
               </span>
@@ -347,71 +358,43 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Split Pro Tool Footer */}
+      {/* Split Pro Footer */}
       <footer
         id="app-footer"
-        className="mt-16 border-t border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0D1117] text-gray-600 dark:text-gray-400 py-12 px-4 sm:px-6 transition-colors"
+        className="mt-16 border-t border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0D1117] py-8 px-4 sm:px-6 transition-colors"
       >
-        <div className="max-w-7xl mx-auto flex flex-col gap-8">
-          {/* Top Row: Brand & Security Badges */}
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div id="footer-brand" className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-white text-base shadow-sm shadow-blue-900/30">
-                S
-              </div>
-              <div>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-lg font-bold tracking-tight text-gray-900 dark:text-white">
-                    SPLIT<span className="text-blue-600 dark:text-blue-500 underline underline-offset-4 decoration-2">PRO</span>
-                  </span>
-                  <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
-                    Studio
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Lossless in-browser image slicing & panel dividing engine
-                </p>
-              </div>
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500 dark:text-gray-400">
+          <div id="footer-brand" className="flex items-center gap-3">
+            <div className="w-7 h-7 bg-blue-600 rounded flex items-center justify-center font-bold text-white text-sm shadow-sm">
+              S
             </div>
-
-            {/* Feature Highlights */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-50 dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] text-gray-700 dark:text-gray-300">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                <span>100% Client-Side</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-50 dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] text-gray-700 dark:text-gray-300">
-                <Zap className="w-3.5 h-3.5 text-amber-500" />
-                <span>Zero Server Lag</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-50 dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] text-gray-700 dark:text-gray-300">
-                <Scissors className="w-3.5 h-3.5 text-blue-500" />
-                <span>Lossless 4K/8K Slices</span>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold tracking-tight text-gray-900 dark:text-white">
+                Split Pro
+              </span>
+              <span className="text-gray-300 dark:text-gray-700">•</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                High-Quality Image Slicing & Grid Tool
+              </span>
             </div>
           </div>
 
-          {/* Bottom Row: Quick Actions */}
-          <div className="pt-6 border-t border-gray-100 dark:border-[#21262D] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-gray-500 dark:text-gray-400">
-            <div className="flex flex-wrap items-center gap-4">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              >
-                Upload File
-              </button>
-              <span>•</span>
-              <button
-                type="button"
-                onClick={onPasteRequested}
-                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              >
-                Paste Clipboard
-              </button>
-              <span>•</span>
-              <span>PNG / JPG / WebP / PDF / ZIP</span>
-            </div>
+          <div className="flex items-center gap-4 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              Upload Image
+            </button>
+            <span className="text-gray-300 dark:text-gray-700">•</span>
+            <button
+              type="button"
+              onClick={onPasteRequested}
+              className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              Paste from Clipboard
+            </button>
           </div>
         </div>
       </footer>

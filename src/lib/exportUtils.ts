@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
-import { PanelSlice, PdfExportOptions } from '../types';
+import { PanelSlice, PdfExportOptions, BatchImageResult } from '../types';
 
 /**
  * Sanitizes a filename to ensure safe cross-platform saving without path traversal or illegal characters.
@@ -138,6 +138,75 @@ export async function createAndDownloadZip(
   );
 
   const cleanZipName = sanitizeFilename(zipFilename, 'split_images.zip');
+  const safeZipName = cleanZipName.endsWith('.zip') ? cleanZipName : `${cleanZipName}.zip`;
+  downloadBlob(zipBlob, safeZipName);
+}
+
+/**
+ * Packs multiple images' slices into a single unified ZIP archive.
+ * Organizes slices cleanly into individual image folders when multiple images are exported,
+ * preventing any file name collisions.
+ */
+export async function createAndDownloadBatchZip(
+  batch: BatchImageResult[],
+  zipFilename: string,
+  onProgress?: (progress: number) => void
+): Promise<void> {
+  const zip = new JSZip();
+  const usedFolderNames = new Set<string>();
+
+  for (let bIndex = 0; bIndex < batch.length; bIndex++) {
+    const item = batch[bIndex];
+    const rawBaseName = item.imageName.replace(/\.[^/.]+$/, '') || `image_${bIndex + 1}`;
+    const folderName = sanitizeFilename(rawBaseName, `image_${bIndex + 1}`);
+
+    // Ensure unique folder name
+    let counter = 1;
+    let uniqueFolder = folderName;
+    while (usedFolderNames.has(uniqueFolder.toLowerCase())) {
+      uniqueFolder = `${folderName}_(${counter})`;
+      counter++;
+    }
+    usedFolderNames.add(uniqueFolder.toLowerCase());
+
+    const folder = batch.length > 1 ? zip.folder(uniqueFolder) || zip : zip;
+    const usedSliceNames = new Set<string>();
+
+    for (let pIndex = 0; pIndex < item.panels.length; pIndex++) {
+      const panel = item.panels[pIndex];
+      if (panel.blob) {
+        const baseName = sanitizeFilename(panel.customName || panel.filename, `panel_${pIndex + 1}.png`);
+        let finalName = baseName;
+        let c = 1;
+        while (usedSliceNames.has(finalName.toLowerCase())) {
+          const dotIndex = baseName.lastIndexOf('.');
+          if (dotIndex !== -1) {
+            finalName = `${baseName.substring(0, dotIndex)}_(${c})${baseName.substring(dotIndex)}`;
+          } else {
+            finalName = `${baseName}_(${c})`;
+          }
+          c++;
+        }
+        usedSliceNames.add(finalName.toLowerCase());
+        folder.file(finalName, panel.blob);
+      }
+    }
+  }
+
+  const zipBlob = await zip.generateAsync(
+    {
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 },
+    },
+    (metadata) => {
+      if (onProgress) {
+        onProgress(Math.round(metadata.percent));
+      }
+    }
+  );
+
+  const cleanZipName = sanitizeFilename(zipFilename, 'split_pro_batch_export.zip');
   const safeZipName = cleanZipName.endsWith('.zip') ? cleanZipName : `${cleanZipName}.zip`;
   downloadBlob(zipBlob, safeZipName);
 }

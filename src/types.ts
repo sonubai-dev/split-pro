@@ -6,6 +6,8 @@ export type FitMode = 'original' | 'fit' | 'fill' | 'crop';
 
 export type OutputFormat = 'png' | 'jpeg' | 'webp';
 
+export type ResolutionMode = '4k' | '2k' | 'original' | 'custom';
+
 export type GapBehavior = 'spacing' | 'skip_source';
 
 export interface CustomSplitLine {
@@ -58,7 +60,9 @@ export interface EditorSettings {
   panelOrder: PanelOrder;
   outputFormat: OutputFormat;
   quality: number; // 1 to 100
-  resolutionMode: 'original' | 'custom';
+  resolutionMode: ResolutionMode;
+  enhanceTo4K?: boolean; // Automatically enhance quality up to 4K on upload & export
+  sharpnessBoost?: boolean; // Unsharp edge enhancement for ultra-crisp details
   customScalePercent: number; // e.g. 100, 75, 50, 200
   customWidth?: number;
   customHeight?: number;
@@ -104,6 +108,11 @@ export interface ProcessingProgress {
   percentage: number;
   stage: string;
   cancellable: boolean;
+}
+
+export interface BatchImageResult {
+  imageName: string;
+  panels: PanelSlice[];
 }
 
 export interface ToastMessage {

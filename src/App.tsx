@@ -45,30 +45,6 @@ export default function App() {
     cancellable: true,
   });
 
-  // Image loading hook
-  const {
-    image,
-    isLoading,
-    error,
-    isLargeImageWarning,
-    pendingDimensions,
-    loadImageFromFile,
-    loadImageFromUrl,
-    acceptLargeImage,
-    resizeAndAcceptLargeImage,
-    clearImage,
-    setError,
-  } = useImageLoader((loaded) => {
-    addToast('Image Loaded', `${loaded.name} (${loaded.width} × ${loaded.height} px)`, 'success');
-  });
-
-  // Show error toast if any occurs during upload
-  useEffect(() => {
-    if (error) {
-      addToast('Upload Failed', error, 'error');
-    }
-  }, [error, addToast]);
-
   // Editor settings & history
   const {
     settings,
@@ -80,22 +56,67 @@ export default function App() {
     canRedo,
   } = useEditorHistory(DEFAULT_SETTINGS);
 
+  // Image loading hook with automatic 4K Ultra-HD Enhancement activation
+  const {
+    image,
+    images,
+    activeImageIndex,
+    setActiveImageIndex,
+    isLoading,
+    error,
+    isLargeImageWarning,
+    pendingDimensions,
+    loadImageFromFile,
+    loadImagesFromFiles,
+    removeImageAtIndex,
+    loadImageFromUrl,
+    acceptLargeImage,
+    resizeAndAcceptLargeImage,
+    clearImage,
+    setError,
+  } = useImageLoader((loaded, totalCount) => {
+    // Automatically configure 4K Ultra-HD Quality Enhancement on upload
+    updateSettings({
+      enhanceTo4K: true,
+      resolutionMode: '4k',
+      sharpnessBoost: true,
+      quality: 100,
+    });
+    const batchSummary = (totalCount && totalCount > 1)
+      ? `Batch of ${totalCount} images loaded!`
+      : `${loaded.name} (${loaded.width} × ${loaded.height} px)`;
+    addToast(
+      '4K Ultra HD Export Active',
+      `${batchSummary} — Slices will be automatically enhanced to 4K resolution on export.`,
+      'success'
+    );
+  });
+
+  // Show error toast if any occurs during upload
+  useEffect(() => {
+    if (error) {
+      addToast('Upload Failed', error, 'error');
+    }
+  }, [error, addToast]);
+
   // Global Clipboard paste handler
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
-        const file = e.clipboardData.files[0];
-        if (file.type.startsWith('image/')) {
+        const imageFiles = Array.from(e.clipboardData.files).filter((f) =>
+          f.type.startsWith('image/')
+        );
+        if (imageFiles.length > 0) {
           e.preventDefault();
-          loadImageFromFile(file);
-          addToast('Pasted Image', file.name || 'Clipboard image', 'info');
+          loadImagesFromFiles(imageFiles);
+          addToast('Pasted Image(s)', `${imageFiles.length} image(s) loaded from clipboard`, 'info');
         }
       }
     };
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [loadImageFromFile, addToast]);
+  }, [loadImagesFromFiles, addToast]);
 
   // Hidden file input for header "New Image" trigger or keyboard shortcuts
   const hiddenFileInputRef = useRef<HTMLInputElement>(null);
@@ -106,7 +127,8 @@ export default function App() {
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      loadImageFromFile(e.target.files[0]);
+      loadImagesFromFiles(Array.from(e.target.files));
+      e.target.value = '';
     }
   };
 
@@ -139,7 +161,8 @@ export default function App() {
       <input
         ref={hiddenFileInputRef}
         type="file"
-        accept="image/png, image/jpeg, image/webp, image/jpg"
+        accept="image/png, image/jpeg, image/webp, image/jpg, image/avif"
+        multiple
         className="hidden"
         onChange={handleFileInputChange}
       />
@@ -150,6 +173,7 @@ export default function App() {
         toggleTheme={toggleTheme}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         hasImage={!!image}
+        batchCount={images.length}
         onNewImage={handleTriggerUpload}
         hasPanels={false}
         onGoHome={clearImage}
@@ -160,12 +184,18 @@ export default function App() {
         {!image ? (
           <LandingPage
             onImageSelected={loadImageFromFile}
+            onImagesSelected={loadImagesFromFiles}
             onSampleSelected={loadImageFromUrl}
             onPasteRequested={handlePasteRequested}
           />
         ) : (
           <EditorWorkspace
             image={image}
+            images={images}
+            activeImageIndex={activeImageIndex}
+            onSelectImageIndex={setActiveImageIndex}
+            onAddImages={loadImagesFromFiles}
+            onRemoveImageIndex={removeImageAtIndex}
             settings={settings}
             canUndo={canUndo}
             canRedo={canRedo}

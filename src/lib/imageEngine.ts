@@ -244,7 +244,29 @@ export function calculateSlices(
     }
   }
 
-  const scaleMultiplier = resolutionMode === 'custom' ? Math.max(0.1, customScalePercent / 100) : 1.0;
+  // 4K Ultra-HD & Dynamic Resolution Scaling
+  const maxDim = Math.max(sourceWidth, sourceHeight);
+  let scaleMultiplier = 1.0;
+
+  if (settings.enhanceTo4K || settings.resolutionMode === '4k') {
+    // 4K Ultra HD target: 3840px on longest dimension
+    if (maxDim < 3840) {
+      scaleMultiplier = Number((3840 / maxDim).toFixed(4));
+    } else {
+      scaleMultiplier = 1.0;
+    }
+  } else if (settings.resolutionMode === '2k') {
+    if (maxDim < 2560) {
+      scaleMultiplier = Number((2560 / maxDim).toFixed(4));
+    } else {
+      scaleMultiplier = 1.0;
+    }
+  } else if (settings.resolutionMode === 'custom') {
+    scaleMultiplier = Math.max(0.1, (customScalePercent || 100) / 100);
+  } else {
+    scaleMultiplier = 1.0;
+  }
+
   const prefix = namingPrefix.trim() || 'panel';
 
   return orderedSlices.map((item, index) => {
@@ -279,6 +301,55 @@ export function calculateSlices(
 }
 
 /**
+ * Applies high-frequency detail enhancement and edge sharpening to canvas slices.
+ * Ensures upscaled 4K imagery looks sharp and defined instead of soft or blurry.
+ */
+export function applySharpnessEnhancement(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  width: number,
+  height: number,
+  strength: number = 0.18
+): void {
+  try {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const src = imgData.data;
+    const dst = new Uint8ClampedArray(src);
+    const w = width;
+    const h = height;
+
+    const a = Math.max(0.05, Math.min(0.4, strength));
+    const center = 1 + 4 * a;
+
+    // Process interior pixels with 3x3 unsharp convolution
+    for (let y = 1; y < h - 1; y++) {
+      const rowPrev = (y - 1) * w;
+      const rowCurr = y * w;
+      const rowNext = (y + 1) * w;
+
+      for (let x = 1; x < w - 1; x++) {
+        const i = (rowCurr + x) << 2;
+        const top = (rowPrev + x) << 2;
+        const bottom = (rowNext + x) << 2;
+        const left = (rowCurr + (x - 1)) << 2;
+        const right = (rowCurr + (x + 1)) << 2;
+
+        // Red
+        src[i] = center * dst[i] - a * (dst[top] + dst[bottom] + dst[left] + dst[right]);
+        // Green
+        src[i + 1] = center * dst[i + 1] - a * (dst[top + 1] + dst[bottom + 1] + dst[left + 1] + dst[right + 1]);
+        // Blue
+        src[i + 2] = center * dst[i + 2] - a * (dst[top + 2] + dst[bottom + 2] + dst[left + 2] + dst[right + 2]);
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  } catch (err) {
+    // If context doesn't support reading or is tainted, silently skip
+    console.debug('Sharpness enhancement skipped:', err);
+  }
+}
+
+/**
  * Extracts high resolution panel blobs from the ORIGINAL source image.
  * Never downsamples from preview canvas; draws raw pixel rectangles at 100% fidelity.
  * Supports createImageBitmap, OffscreenCanvas (where supported), or high-DPI HTMLCanvasElement.
@@ -301,7 +372,7 @@ export async function generatePanelOutputs(
       : 'image/png';
 
   // Configurable quality from 1 to 100 (converted to 0.01-1.00 float). PNG is always lossless (1.0).
-  const rawQuality = typeof settings.quality === 'number' ? settings.quality : 95;
+  const rawQuality = typeof settings.quality === 'number' ? settings.quality : 100;
   const qualityFactor = settings.outputFormat === 'png' ? 1.0 : Math.max(0.01, Math.min(1.0, rawQuality / 100));
 
   // Prepare source drawable: ensure imgElement is complete and valid
@@ -359,6 +430,11 @@ export async function generatePanelOutputs(
 
         ctx.drawImage(drawableSource, sx, sy, sw, sh, 0, 0, dw, dh);
 
+        // Apply 4K sharpness enhancement filter if active
+        if (settings.sharpnessBoost !== false) {
+          applySharpnessEnhancement(ctx, dw, dh, 0.18);
+        }
+
         blob = await offscreen.convertToBlob({
           type: mimeType,
           quality: qualityFactor,
@@ -382,6 +458,11 @@ export async function generatePanelOutputs(
         }
 
         ctx.drawImage(drawableSource, sx, sy, sw, sh, 0, 0, dw, dh);
+
+        // Apply 4K sharpness enhancement filter if active
+        if (settings.sharpnessBoost !== false) {
+          applySharpnessEnhancement(ctx, dw, dh, 0.18);
+        }
 
         blob = await new Promise<Blob>((resolve, reject) => {
           canvas.toBlob(

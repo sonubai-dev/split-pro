@@ -29,6 +29,7 @@ import { calculateAutoSplitGrid, detectPictureBorders, formatBytes } from '../li
 
 interface ControlPanelProps {
   image: LoadedImage;
+  batchCount?: number;
   settings: EditorSettings;
   smartSuggestions: SmartSuggestion[];
   sliceCount: number;
@@ -57,6 +58,7 @@ const HORIZONTAL_PRESETS = [2, 3, 4, 5, 6, 8, 10];
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
   image,
+  batchCount,
   settings,
   smartSuggestions,
   sliceCount,
@@ -133,9 +135,16 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className="p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold block mb-1">
-                Source Image
-              </span>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold block">
+                  Source Image
+                </span>
+                {batchCount && batchCount > 1 && (
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-mono">
+                    Batch ({batchCount})
+                  </span>
+                )}
+              </div>
               <h4 className="text-xs font-semibold text-gray-900 dark:text-white truncate" title={image.name}>
                 {image.name}
               </h4>
@@ -164,6 +173,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               </button>
             </div>
           </div>
+          {batchCount && batchCount > 1 && (
+            <p className="mt-2 pt-2 border-t border-gray-200 dark:border-[#374151] text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+              ⚡ Settings apply to all {batchCount} images in batch.
+            </p>
+          )}
         </div>
 
         {/* Section 2: Smart Suggestions Banner */}
@@ -976,40 +990,104 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
           )}
 
-          {/* Resolution Mode: Original vs Custom */}
-          <div className="pt-2 border-t border-gray-200 dark:border-[#374151] space-y-2">
+          {/* Resolution Mode: 4K Ultra HD vs 2K vs Original vs Custom */}
+          <div className="pt-2 border-t border-gray-200 dark:border-[#374151] space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-600 dark:text-gray-400">Output Resolution</span>
-              <div className="flex rounded bg-gray-200 dark:bg-[#111827] p-0.5 border border-gray-300 dark:border-[#374151]">
-                <button
-                  type="button"
-                  onClick={() => onUpdateSettings({ resolutionMode: 'original', customScalePercent: 100 })}
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
-                    settings.resolutionMode === 'original'
-                      ? 'bg-blue-600 text-white font-bold'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  Original (1:1)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onUpdateSettings({ resolutionMode: 'custom' })}
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
-                    settings.resolutionMode === 'custom'
-                      ? 'bg-blue-600 text-white font-bold'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  Custom Scale
-                </button>
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span className="text-xs font-semibold text-gray-900 dark:text-white">Export Quality & Resolution</span>
               </div>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20">
+                4K BOOST
+              </span>
             </div>
 
-            {settings.resolutionMode === 'custom' && (
-              <div className="space-y-2 pt-1">
+            {/* 4K Enhancement Toggle Card */}
+            <div className="p-2.5 rounded bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-xs font-semibold text-gray-900 dark:text-white cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={settings.enhanceTo4K || settings.resolutionMode === '4k'}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      onUpdateSettings({
+                        enhanceTo4K: enabled,
+                        resolutionMode: enabled ? '4k' : 'original',
+                        sharpnessBoost: enabled,
+                        quality: enabled ? 100 : settings.quality,
+                      });
+                    }}
+                    className="rounded border-amber-500 text-amber-600 focus:ring-0 cursor-pointer"
+                  />
+                  <span>Auto 4K Ultra-HD Enhancement</span>
+                </label>
+                <span className="text-[10px] font-mono text-amber-700 dark:text-amber-300 font-bold">
+                  {(settings.enhanceTo4K || settings.resolutionMode === '4k') ? '3840px Max' : 'OFF'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">
+                Automatically elevates uploaded images up to 4K Ultra HD on export with crystal-clear sharpness.
+              </p>
+            </div>
+
+            {/* Resolution Selector Buttons */}
+            <div className="grid grid-cols-4 gap-1 p-0.5 rounded bg-gray-200 dark:bg-[#111827] border border-gray-300 dark:border-[#374151]">
+              <button
+                type="button"
+                onClick={() => onUpdateSettings({ resolutionMode: '4k', enhanceTo4K: true, sharpnessBoost: true })}
+                className={`py-1 text-[11px] font-mono font-bold rounded transition-colors ${
+                  settings.resolutionMode === '4k' || settings.enhanceTo4K
+                    ? 'bg-amber-500 text-black shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+                title="Scale image up to 4K Ultra-HD (3840px)"
+              >
+                4K UHD
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdateSettings({ resolutionMode: '2k', enhanceTo4K: false, sharpnessBoost: true })}
+                className={`py-1 text-[11px] font-mono font-bold rounded transition-colors ${
+                  settings.resolutionMode === '2k' && !settings.enhanceTo4K
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+                title="Scale image up to 2K QHD (2560px)"
+              >
+                2K QHD
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdateSettings({ resolutionMode: 'original', enhanceTo4K: false, customScalePercent: 100 })}
+                className={`py-1 text-[11px] font-mono font-bold rounded transition-colors ${
+                  settings.resolutionMode === 'original' && !settings.enhanceTo4K
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+                title="Keep original raw resolution (1:1)"
+              >
+                1:1 Native
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdateSettings({ resolutionMode: 'custom', enhanceTo4K: false })}
+                className={`py-1 text-[11px] font-mono font-bold rounded transition-colors ${
+                  settings.resolutionMode === 'custom' && !settings.enhanceTo4K
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+                title="Custom scaling percentage"
+              >
+                Custom
+              </button>
+            </div>
+
+            {/* Custom Scale Slider if custom selected */}
+            {settings.resolutionMode === 'custom' && !settings.enhanceTo4K && (
+              <div className="space-y-1.5 pt-1">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600 dark:text-gray-400">Scale Factor</span>
+                  <span className="text-gray-600 dark:text-gray-400">Custom Scale Factor</span>
                   <span className="font-mono font-bold text-gray-900 dark:text-white">
                     {settings.customScalePercent}%
                   </span>
@@ -1017,7 +1095,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 <input
                   type="range"
                   min={25}
-                  max={200}
+                  max={300}
                   step={5}
                   value={settings.customScalePercent}
                   onChange={(e) =>
@@ -1028,25 +1106,49 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               </div>
             )}
 
-            {/* Display Output Status: Original / Downscaled / Upscaled */}
-            <div className="flex items-center justify-between text-[11px] font-mono pt-1 text-gray-500 dark:text-gray-400">
-              <span>Status:</span>
-              <span
-                className={`font-bold px-1.5 py-0.5 rounded ${
-                  settings.resolutionMode === 'original' || settings.customScalePercent === 100
-                    ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/40'
-                    : settings.customScalePercent < 100
-                    ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/40'
-                    : 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-300 dark:border-blue-800/40'
-                }`}
-              >
-                {settings.resolutionMode === 'original' || settings.customScalePercent === 100
-                  ? 'Original (100%)'
-                  : settings.customScalePercent < 100
-                  ? `Downscaled (${settings.customScalePercent}%)`
-                  : `Upscaled (${settings.customScalePercent}%)`}
-              </span>
-            </div>
+            {/* Detail Sharpening Toggle */}
+            <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none pt-0.5">
+              <input
+                type="checkbox"
+                checked={settings.sharpnessBoost !== false}
+                onChange={(e) => onUpdateSettings({ sharpnessBoost: e.target.checked })}
+                className="rounded border-gray-300 dark:border-[#374151] text-blue-600 focus:ring-0"
+              />
+              <span>Smart Detail & Edge Sharpening (prevents upscaling blur)</span>
+            </label>
+
+            {/* Calculated Output Dimension Status */}
+            {(() => {
+              const maxDim = Math.max(image.width, image.height);
+              let mult = 1.0;
+              let label = 'Native 1:1';
+              let badgeColor = 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/40';
+
+              if (settings.enhanceTo4K || settings.resolutionMode === '4k') {
+                mult = maxDim < 3840 ? (3840 / maxDim) : 1.0;
+                label = maxDim < 3840 ? `4K Enhanced (${(mult).toFixed(1)}× Upscale)` : 'Native 4K+ Lossless';
+                badgeColor = 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800/40';
+              } else if (settings.resolutionMode === '2k') {
+                mult = maxDim < 2560 ? (2560 / maxDim) : 1.0;
+                label = maxDim < 2560 ? `2K Enhanced (${(mult).toFixed(1)}×)` : 'Native 2K+ Lossless';
+                badgeColor = 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800/40';
+              } else if (settings.resolutionMode === 'custom') {
+                mult = (settings.customScalePercent || 100) / 100;
+                label = `Custom (${settings.customScalePercent}%)`;
+              }
+
+              const targetW = Math.round(image.width * mult);
+              const targetH = Math.round(image.height * mult);
+
+              return (
+                <div className="flex items-center justify-between text-[11px] font-mono pt-1 text-gray-500 dark:text-gray-400">
+                  <span>Export Canvas:</span>
+                  <span className={`font-bold px-1.5 py-0.5 rounded border ${badgeColor}`}>
+                    {targetW} × {targetH} px • {label}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Naming Options */}

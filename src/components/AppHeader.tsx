@@ -14,6 +14,7 @@ interface AppHeaderProps {
   toggleTheme: () => void;
   onOpenShortcuts: () => void;
   hasImage: boolean;
+  batchCount?: number;
   onNewImage: () => void;
   onExportAll?: () => void;
   hasPanels: boolean;
@@ -25,6 +26,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   toggleTheme,
   onOpenShortcuts,
   hasImage,
+  batchCount,
   onNewImage,
   onExportAll,
   hasPanels,
@@ -46,9 +48,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             <span className="text-base sm:text-lg font-bold tracking-tight text-gray-900 dark:text-white">
               SPLIT<span className="text-blue-600 dark:text-blue-500 underline underline-offset-4 decoration-2">PRO</span>
             </span>
-            <span className="hidden sm:inline text-[9px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151]">
-              Minimal
-            </span>
+            {batchCount && batchCount > 1 ? (
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                {batchCount} IMAGES
+              </span>
+            ) : (
+              <span className="hidden sm:inline text-[9px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151]">
+                Minimal
+              </span>
+            )}
           </div>
         </div>
 

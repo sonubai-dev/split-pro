@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Sliders,
   Maximize,
@@ -9,6 +9,9 @@ import {
   Sparkles,
   Download,
   FileArchive,
+  Images,
+  Plus,
+  X,
 } from 'lucide-react';
 import {
   EditorSettings,
@@ -16,6 +19,7 @@ import {
   PanelSlice,
   PdfExportOptions,
   ProcessingProgress,
+  BatchImageResult,
 } from '../types';
 import { ControlPanel } from './ControlPanel';
 import { ImageCanvas } from './ImageCanvas';
@@ -26,10 +30,21 @@ import {
   generatePanelOutputs,
   generateSmartSuggestions,
 } from '../lib/imageEngine';
-import { downloadBlob, createAndDownloadZip, downloadAllPanels, createAndDownloadPdf } from '../lib/exportUtils';
+import {
+  downloadBlob,
+  createAndDownloadZip,
+  createAndDownloadBatchZip,
+  downloadAllPanels,
+  createAndDownloadPdf,
+} from '../lib/exportUtils';
 
 interface EditorWorkspaceProps {
   image: LoadedImage;
+  images?: LoadedImage[];
+  activeImageIndex?: number;
+  onSelectImageIndex?: (index: number) => void;
+  onAddImages?: (files: File[]) => void;
+  onRemoveImageIndex?: (index: number) => void;
   settings: EditorSettings;
   canUndo: boolean;
   canRedo: boolean;
@@ -46,6 +61,11 @@ interface EditorWorkspaceProps {
 
 export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
   image,
+  images = [],
+  activeImageIndex = 0,
+  onSelectImageIndex,
+  onAddImages,
+  onRemoveImageIndex,
   settings,
   canUndo,
   canRedo,
@@ -69,6 +89,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
   const [generatedPanels, setGeneratedPanels] = useState<PanelSlice[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const batchInputRef = useRef<HTMLInputElement>(null);
 
   // Compute live slice boundaries based on current settings
   const currentSlices = useMemo(() => {
@@ -93,12 +114,14 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
     setAbortController(controller);
     setIsGenerating(true);
 
+    const is4K = settings.enhanceTo4K || settings.resolutionMode === '4k';
+
     setProgress({
       active: true,
       current: 0,
       total: currentSlices.length,
       percentage: 0,
-      stage: 'Generating High-Resolution Panels...',
+      stage: is4K ? 'Enhancing to 4K Ultra-HD & Slicing Panels...' : 'Generating High-Resolution Panels...',
       cancellable: true,
     });
 
@@ -121,7 +144,11 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
       setGeneratedPanels(results);
       setIsGenerating(false);
       setProgress((prev) => ({ ...prev, active: false }));
-      onToast('Panels Generated', `Successfully sliced into ${results.length} panels.`, 'success');
+      onToast(
+        is4K ? '4K Ultra-HD Panels Ready' : 'Panels Generated',
+        `Successfully rendered ${results.length} panels in ${is4K ? 'enhanced 4K UHD' : 'high'} resolution.`,
+        'success'
+      );
 
       // On mobile switch to results tab to view outputs
       if (window.innerWidth < 1024) {
@@ -255,6 +282,99 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
       onToast('ZIP Failed', 'Could not create archive.', 'error');
     }
   }, [generatedPanels, image, currentSlices, settings, setProgress, onToast]);
+
+  const handleBatchExportZip = useCallback(async () => {
+    const listToProcess = images && images.length > 0 ? images : [image];
+    if (listToProcess.length === 0) return;
+
+    const controller = new AbortController();
+    setAbortController(controller);
+    setIsGenerating(true);
+
+    const totalImages = listToProcess.length;
+    const batchOutputs: BatchImageResult[] = [];
+    const is4K = settings.enhanceTo4K || settings.resolutionMode === '4k';
+
+    try {
+      for (let imgIndex = 0; imgIndex < totalImages; imgIndex++) {
+        if (controller.signal.aborted) {
+          throw new Error('Batch processing cancelled by user.');
+        }
+
+        const currentImg = listToProcess[imgIndex];
+        const imgSlices = calculateSlices(currentImg.width, currentImg.height, settings);
+
+        setProgress({
+          active: true,
+          current: imgIndex + 1,
+          total: totalImages,
+          percentage: Math.round((imgIndex / totalImages) * 100),
+          stage: `Processing image ${imgIndex + 1} of ${totalImages}: "${currentImg.name}" (${imgSlices.length} slices, ${is4K ? '4K Ultra-HD' : 'native'})...`,
+          cancellable: true,
+        });
+
+        const renderedPanels = await generatePanelOutputs(
+          currentImg,
+          imgSlices,
+          settings,
+          (prog) => {
+            const currentImgFraction = (prog.percentage || 0) / 100;
+            const overallPercentage = Math.min(
+              94,
+              Math.round(((imgIndex + currentImgFraction) / totalImages) * 100)
+            );
+            setProgress((prev) => ({
+              ...prev,
+              percentage: overallPercentage,
+            }));
+          },
+          controller.signal
+        );
+
+        batchOutputs.push({
+          imageName: currentImg.name,
+          panels: renderedPanels,
+        });
+      }
+
+      // Final ZIP packaging into a single archive
+      setProgress({
+        active: true,
+        current: totalImages,
+        total: totalImages,
+        percentage: 95,
+        stage: `Packaging all slices into a single unified ZIP archive...`,
+        cancellable: false,
+      });
+
+      const zipBase = settings.namingPrefix.trim() || 'split_pro_batch_export';
+      const zipName = zipBase.endsWith('.zip') ? zipBase : `${zipBase}.zip`;
+
+      await createAndDownloadBatchZip(batchOutputs, zipName, (percent) => {
+        setProgress((prev) => ({
+          ...prev,
+          percentage: 95 + Math.round(percent * 0.05),
+        }));
+      });
+
+      setIsGenerating(false);
+      setProgress((prev) => ({ ...prev, active: false }));
+      const totalSlices = batchOutputs.reduce((acc, item) => acc + item.panels.length, 0);
+      onToast(
+        'Batch Export Complete',
+        `Successfully saved ${totalSlices} slices from ${totalImages} images into "${zipName}".`,
+        'success'
+      );
+    } catch (err: any) {
+      setIsGenerating(false);
+      setProgress((prev) => ({ ...prev, active: false }));
+      if (err?.message !== 'Batch processing cancelled by user.') {
+        onToast('Batch Export Failed', err?.message || 'Could not export batch.', 'error');
+      } else {
+        onToast('Export Cancelled', 'Batch processing was cancelled.', 'info');
+      }
+    }
+  }, [images, image, settings, setProgress, onToast]);
 
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
@@ -422,14 +542,115 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
 
         {/* Right Action */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleDownloadZip}
-            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20 transition-all active:scale-95"
-          >
-            <FileArchive className="w-3.5 h-3.5" />
-            <span>Export ZIP</span>
-          </button>
+          {images.length > 1 ? (
+            <button
+              type="button"
+              onClick={handleBatchExportZip}
+              disabled={isGenerating}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50"
+              title={`Slice and export all ${images.length} images into a single ZIP`}
+            >
+              <FileArchive className="w-3.5 h-3.5" />
+              <span>Export All {images.length} (ZIP)</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleDownloadZip}
+              disabled={isGenerating}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <FileArchive className="w-3.5 h-3.5" />
+              <span>Export ZIP</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Batch Image Management Strip */}
+      <div className="h-10 px-4 sm:px-6 bg-gray-50/90 dark:bg-[#0E131F] border-b border-gray-200 dark:border-[#1F2937] flex items-center justify-between gap-3 overflow-x-auto select-none shrink-0 transition-colors">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold font-mono bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+            <Images className="w-3.5 h-3.5" />
+            BATCH ({images.length || 1})
+          </span>
+        </div>
+
+        {/* Horizontal Image Thumbnails Strip */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 flex-1 max-w-3xl">
+          {images.map((img, idx) => {
+            const isActive = idx === activeImageIndex;
+            return (
+              <div
+                key={`${img.name}-${idx}`}
+                onClick={() => onSelectImageIndex && onSelectImageIndex(idx)}
+                className={`group flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium cursor-pointer transition-all shrink-0 border ${
+                  isActive
+                    ? 'bg-white dark:bg-[#1F2937] text-blue-600 dark:text-blue-400 border-blue-500 shadow-xs font-semibold'
+                    : 'bg-white/60 dark:bg-[#161B22] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-[#30363D] hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+                title={`Switch active preview to ${img.name} (${img.width}×${img.height}px)`}
+              >
+                {img.url ? (
+                  <img src={img.url} alt="" className="w-4 h-4 object-cover rounded shrink-0" />
+                ) : (
+                  <span className="w-4 h-4 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[9px] font-bold">
+                    {idx + 1}
+                  </span>
+                )}
+                <span className="truncate max-w-[100px] sm:max-w-[130px]">{img.name}</span>
+                <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">
+                  {img.width}×{img.height}
+                </span>
+                {images.length > 1 && onRemoveImageIndex && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveImageIndex(idx);
+                    }}
+                    className="p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors ml-0.5"
+                    title={`Remove ${img.name} from batch`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Add more images button */}
+          {onAddImages && (
+            <>
+              <input
+                ref={batchInputRef}
+                type="file"
+                accept="image/png, image/jpeg, image/webp, image/jpg, image/avif"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    onAddImages(Array.from(e.target.files));
+                    e.target.value = '';
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => batchInputRef.current?.click()}
+                className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-[#1F2937] hover:bg-gray-100 dark:hover:bg-[#2D3748] border border-dashed border-gray-300 dark:border-gray-600 transition-colors shrink-0"
+                title="Add more images to this batch"
+              >
+                <Plus className="w-3 h-3 text-blue-500" />
+                <span>Add Images</span>
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Right side batch helper */}
+        <div className="hidden lg:flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400 font-mono shrink-0">
+          <span>Settings applied across batch</span>
         </div>
       </div>
 
@@ -443,6 +664,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
         >
           <ControlPanel
             image={image}
+            batchCount={images.length}
             settings={settings}
             smartSuggestions={smartSuggestions}
             sliceCount={currentSlices.length}
@@ -481,6 +703,8 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
             panels={generatedPanels}
             selectedPanelId={selectedPanelId}
             isGenerating={isGenerating}
+            batchCount={images.length}
+            onBatchDownloadZip={handleBatchExportZip}
             onSelectPanel={(id) => setSelectedPanelId(id)}
             onDownloadSingle={handleDownloadSingle}
             onDownloadAll={handleDownloadAll}
