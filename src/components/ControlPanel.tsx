@@ -15,6 +15,9 @@ import {
   Check,
   Info,
   Layers,
+  Sun,
+  RotateCcw,
+  Zap,
 } from 'lucide-react';
 import {
   EditorSettings,
@@ -939,24 +942,270 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         </div>
 
-        {/* Section 7: Output Settings */}
-        <div className="p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151] space-y-3">
-          <label className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold block">
-            Output Settings
-          </label>
+        {/* Section 7: Output Settings, 8K Resolution & Contrast */}
+        <div className="p-3.5 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151] space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold block">
+              Output Quality & Resolution
+            </label>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold border border-purple-500/20">
+              UP TO 8K
+            </span>
+          </div>
 
-          {/* Format Picker */}
-          <div>
-            <span className="text-xs text-gray-600 dark:text-gray-400 block mb-1">Format</span>
-            <div className="grid grid-cols-3 gap-1 p-1 rounded bg-gray-100 dark:bg-[#111827] border border-gray-200 dark:border-[#1F2937]">
+          {/* Resolution Selector: Up to 8K Ultra-HD */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-purple-500" /> Resolution Mode
+              </span>
+              <span className="text-[11px] font-mono text-gray-500 dark:text-gray-400">
+                {settings.enhanceTo8K || settings.resolutionMode === '8k'
+                  ? '7680px Max (8K)'
+                  : settings.enhanceTo4K || settings.resolutionMode === '4k'
+                  ? '3840px Max (4K)'
+                  : settings.resolutionMode === '2k'
+                  ? '2560px Max (2K)'
+                  : 'Native 1:1'}
+              </span>
+            </div>
+
+            {/* Big, thumb-friendly 8K / 4K / 2K / Native buttons */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 rounded-lg bg-gray-200/80 dark:bg-[#111827] border border-gray-300 dark:border-[#374151]">
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateSettings({
+                    resolutionMode: '8k',
+                    enhanceTo8K: true,
+                    enhanceTo4K: false,
+                    sharpnessBoost: true,
+                    quality: 100,
+                  })
+                }
+                className={`py-2 px-2 rounded-md text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+                  settings.enhanceTo8K || settings.resolutionMode === '8k'
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30 ring-1 ring-purple-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1F2937]'
+                }`}
+                title="Scale image up to 8K Ultra-HD (7680px)"
+              >
+                <div className="flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 text-amber-300" />
+                  <span>8K Ultra</span>
+                </div>
+                <span className="text-[9px] font-mono opacity-80 font-normal">7680px Max</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateSettings({
+                    resolutionMode: '4k',
+                    enhanceTo4K: true,
+                    enhanceTo8K: false,
+                    sharpnessBoost: true,
+                    quality: 100,
+                  })
+                }
+                className={`py-2 px-2 rounded-md text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+                  (settings.enhanceTo4K || settings.resolutionMode === '4k') &&
+                  !settings.enhanceTo8K &&
+                  settings.resolutionMode !== '8k'
+                    ? 'bg-amber-500 text-black shadow-md shadow-amber-900/20 ring-1 ring-amber-300'
+                    : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1F2937]'
+                }`}
+                title="Scale image up to 4K Ultra-HD (3840px)"
+              >
+                <span>4K UHD</span>
+                <span className="text-[9px] font-mono opacity-80 font-normal">3840px Max</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateSettings({
+                    resolutionMode: '2k',
+                    enhanceTo4K: false,
+                    enhanceTo8K: false,
+                    sharpnessBoost: true,
+                  })
+                }
+                className={`py-2 px-2 rounded-md text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+                  settings.resolutionMode === '2k' &&
+                  !settings.enhanceTo4K &&
+                  !settings.enhanceTo8K
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1F2937]'
+                }`}
+                title="Scale image up to 2K QHD (2560px)"
+              >
+                <span>2K HD</span>
+                <span className="text-[9px] font-mono opacity-80 font-normal">2560px Max</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateSettings({
+                    resolutionMode: 'original',
+                    enhanceTo4K: false,
+                    enhanceTo8K: false,
+                    customScalePercent: 100,
+                  })
+                }
+                className={`py-2 px-2 rounded-md text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+                  settings.resolutionMode === 'original' &&
+                  !settings.enhanceTo4K &&
+                  !settings.enhanceTo8K
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1F2937]'
+                }`}
+                title="Keep original raw resolution (1:1)"
+              >
+                <span>1:1 Native</span>
+                <span className="text-[9px] font-mono opacity-80 font-normal">Source Size</span>
+              </button>
+            </div>
+
+            {/* Informational callout for active resolution */}
+            <div className="p-2.5 rounded-md text-[11px] leading-relaxed border transition-colors bg-purple-500/5 dark:bg-purple-500/10 border-purple-500/20 text-gray-700 dark:text-gray-300">
+              {settings.enhanceTo8K || settings.resolutionMode === '8k' ? (
+                <div className="flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-purple-700 dark:text-purple-300 block">8K Ultra-HD Active</span>
+                    Outputs sliced panels up to 7680px with razor-sharp edge sharpening for extreme detail and printing.
+                  </div>
+                </div>
+              ) : settings.enhanceTo4K || settings.resolutionMode === '4k' ? (
+                <div className="flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-amber-700 dark:text-amber-300 block">4K UHD Active</span>
+                    Outputs sliced panels up to 3840px with crisp edge enhancement.
+                  </div>
+                </div>
+              ) : settings.resolutionMode === '2k' ? (
+                <div className="flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-blue-700 dark:text-blue-300 block">2K HD Active</span>
+                    Outputs sliced panels up to 2560px with clean clarity.
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-gray-800 dark:text-gray-200 block">1:1 Native Resolution</span>
+                    Slices exact pixel dimensions from your source photo without enlargement.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Smart Detail & Edge Sharpening Toggle */}
+            <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none pt-1">
+              <input
+                type="checkbox"
+                checked={settings.sharpnessBoost !== false}
+                onChange={(e) => onUpdateSettings({ sharpnessBoost: e.target.checked })}
+                className="rounded border-gray-300 dark:border-[#374151] text-purple-600 focus:ring-0 cursor-pointer"
+              />
+              <span>Smart Detail Sharpening (keeps cuts ultra-crisp)</span>
+            </label>
+          </div>
+
+          {/* Section: Photo Contrast & Vividness */}
+          <div className="pt-3 border-t border-gray-200 dark:border-[#374151] space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                <Sun className="w-3.5 h-3.5 text-amber-500" /> Photo Contrast
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
+                  {settings.contrast === 100 || !settings.contrast
+                    ? '100% (Natural)'
+                    : settings.contrast > 100
+                    ? `+${settings.contrast - 100}% (Crisp)`
+                    : `-${100 - settings.contrast}% (Soft)`}
+                </span>
+                {settings.contrast !== 100 && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateSettings({ contrast: 100 })}
+                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    title="Reset to 100% Natural"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Quick 1-tap Contrast Preset Pills */}
+            <div className="grid grid-cols-4 gap-1.5">
+              {[
+                { label: 'Natural', value: 100, desc: '100%' },
+                { label: 'Crisp', value: 115, desc: '+15%' },
+                { label: 'Vivid', value: 130, desc: '+30%' },
+                { label: 'Soft', value: 85, desc: '-15%' },
+              ].map((p) => {
+                const isActive = (settings.contrast ?? 100) === p.value;
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => onUpdateSettings({ contrast: p.value })}
+                    className={`py-1.5 px-2 rounded text-xs font-medium transition-all ${
+                      isActive
+                        ? 'bg-amber-500 text-black font-bold shadow-sm ring-1 ring-amber-400'
+                        : 'bg-white dark:bg-[#111827] border border-gray-200 dark:border-[#374151] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1F2937]'
+                    }`}
+                  >
+                    <div>{p.label}</div>
+                    <div className="text-[10px] opacity-75 font-mono">{p.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Smooth Range Slider for Fine Adjustment */}
+            <div className="space-y-1">
+              <input
+                type="range"
+                min={60}
+                max={140}
+                step={2}
+                value={settings.contrast ?? 100}
+                onChange={(e) => onUpdateSettings({ contrast: parseInt(e.target.value, 10) || 100 })}
+                className="w-full accent-amber-500 cursor-pointer h-2 bg-gray-200 dark:bg-[#111827] rounded-lg"
+              />
+              <div className="flex justify-between text-[10px] text-gray-400 font-mono">
+                <span>Soft (60%)</span>
+                <span>Normal (100%)</span>
+                <span>Punchy (140%)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Format & Quality */}
+          <div className="pt-3 border-t border-gray-200 dark:border-[#374151] space-y-2.5">
+            <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 block">
+              Image Format & Quality
+            </span>
+
+            {/* Format Picker */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-gray-100 dark:bg-[#111827] border border-gray-200 dark:border-[#1F2937]">
               {(['png', 'jpeg', 'webp'] as OutputFormat[]).map((fmt) => (
                 <button
                   key={fmt}
                   type="button"
                   onClick={() => onUpdateSettings({ outputFormat: fmt })}
-                  className={`py-1 text-xs font-semibold uppercase rounded transition-all ${
+                  className={`py-1.5 text-xs font-semibold uppercase rounded transition-all ${
                     settings.outputFormat === fmt
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/20'
+                      ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
@@ -964,202 +1213,106 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 </button>
               ))}
             </div>
-          </div>
 
-          {/* Quality Slider for JPG / WebP */}
-          {settings.outputFormat !== 'png' ? (
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-gray-600 dark:text-gray-400">Quality Compression</span>
-                <span className="font-mono font-bold text-gray-900 dark:text-white">
-                  {settings.quality}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min={1}
-                max={100}
-                value={settings.quality}
-                onChange={(e) => onUpdateSettings({ quality: parseInt(e.target.value, 10) || 95 })}
-                className="w-full accent-blue-500 cursor-pointer"
-              />
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-medium">
-              <Check className="w-3.5 h-3.5" /> 100% Lossless Raw Pixels
-            </div>
-          )}
-
-          {/* Resolution Mode: 4K Ultra HD vs 2K vs Original vs Custom */}
-          <div className="pt-2 border-t border-gray-200 dark:border-[#374151] space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span className="text-xs font-semibold text-gray-900 dark:text-white">Export Quality & Resolution</span>
-              </div>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20">
-                4K BOOST
-              </span>
-            </div>
-
-            {/* 4K Enhancement Toggle Card */}
-            <div className="p-2.5 rounded bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs font-semibold text-gray-900 dark:text-white cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={settings.enhanceTo4K || settings.resolutionMode === '4k'}
-                    onChange={(e) => {
-                      const enabled = e.target.checked;
-                      onUpdateSettings({
-                        enhanceTo4K: enabled,
-                        resolutionMode: enabled ? '4k' : 'original',
-                        sharpnessBoost: enabled,
-                        quality: enabled ? 100 : settings.quality,
-                      });
-                    }}
-                    className="rounded border-amber-500 text-amber-600 focus:ring-0 cursor-pointer"
-                  />
-                  <span>Auto 4K Ultra-HD Enhancement</span>
-                </label>
-                <span className="text-[10px] font-mono text-amber-700 dark:text-amber-300 font-bold">
-                  {(settings.enhanceTo4K || settings.resolutionMode === '4k') ? '3840px Max' : 'OFF'}
-                </span>
-              </div>
-              <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">
-                Automatically elevates uploaded images up to 4K Ultra HD on export with crystal-clear sharpness.
-              </p>
-            </div>
-
-            {/* Resolution Selector Buttons */}
-            <div className="grid grid-cols-4 gap-1 p-0.5 rounded bg-gray-200 dark:bg-[#111827] border border-gray-300 dark:border-[#374151]">
-              <button
-                type="button"
-                onClick={() => onUpdateSettings({ resolutionMode: '4k', enhanceTo4K: true, sharpnessBoost: true })}
-                className={`py-1 text-[11px] font-mono font-bold rounded transition-colors ${
-                  settings.resolutionMode === '4k' || settings.enhanceTo4K
-                    ? 'bg-amber-500 text-black shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-                title="Scale image up to 4K Ultra-HD (3840px)"
-              >
-                4K UHD
-              </button>
-              <button
-                type="button"
-                onClick={() => onUpdateSettings({ resolutionMode: '2k', enhanceTo4K: false, sharpnessBoost: true })}
-                className={`py-1 text-[11px] font-mono font-bold rounded transition-colors ${
-                  settings.resolutionMode === '2k' && !settings.enhanceTo4K
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-                title="Scale image up to 2K QHD (2560px)"
-              >
-                2K QHD
-              </button>
-              <button
-                type="button"
-                onClick={() => onUpdateSettings({ resolutionMode: 'original', enhanceTo4K: false, customScalePercent: 100 })}
-                className={`py-1 text-[11px] font-mono font-bold rounded transition-colors ${
-                  settings.resolutionMode === 'original' && !settings.enhanceTo4K
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-                title="Keep original raw resolution (1:1)"
-              >
-                1:1 Native
-              </button>
-              <button
-                type="button"
-                onClick={() => onUpdateSettings({ resolutionMode: 'custom', enhanceTo4K: false })}
-                className={`py-1 text-[11px] font-mono font-bold rounded transition-colors ${
-                  settings.resolutionMode === 'custom' && !settings.enhanceTo4K
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-                title="Custom scaling percentage"
-              >
-                Custom
-              </button>
-            </div>
-
-            {/* Custom Scale Slider if custom selected */}
-            {settings.resolutionMode === 'custom' && !settings.enhanceTo4K && (
-              <div className="space-y-1.5 pt-1">
+            {/* Quality Slider & Presets for JPG / WebP */}
+            {settings.outputFormat !== 'png' ? (
+              <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600 dark:text-gray-400">Custom Scale Factor</span>
+                  <span className="text-gray-600 dark:text-gray-400">Photo Quality</span>
                   <span className="font-mono font-bold text-gray-900 dark:text-white">
-                    {settings.customScalePercent}%
+                    {settings.quality}%
                   </span>
                 </div>
+
+                {/* Quick Quality Presets */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { label: 'Maximum', val: 100 },
+                    { label: 'High', val: 90 },
+                    { label: 'Balanced', val: 80 },
+                  ].map((q) => (
+                    <button
+                      key={q.val}
+                      type="button"
+                      onClick={() => onUpdateSettings({ quality: q.val })}
+                      className={`py-1 px-2 text-[11px] rounded font-medium border transition-colors ${
+                        settings.quality === q.val
+                          ? 'bg-blue-600 text-white border-blue-500'
+                          : 'bg-white dark:bg-[#111827] border-gray-200 dark:border-[#374151] text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      {q.label} ({q.val}%)
+                    </button>
+                  ))}
+                </div>
+
                 <input
                   type="range"
-                  min={25}
-                  max={300}
-                  step={5}
-                  value={settings.customScalePercent}
-                  onChange={(e) =>
-                    onUpdateSettings({ customScalePercent: parseInt(e.target.value, 10) || 100 })
-                  }
-                  className="w-full accent-blue-500 cursor-pointer"
+                  min={20}
+                  max={100}
+                  value={settings.quality}
+                  onChange={(e) => onUpdateSettings({ quality: parseInt(e.target.value, 10) || 95 })}
+                  className="w-full accent-blue-500 cursor-pointer h-2 bg-gray-200 dark:bg-[#111827] rounded-lg"
                 />
               </div>
+            ) : (
+              <div className="p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 flex items-center gap-2 text-xs text-blue-700 dark:text-blue-300 font-medium">
+                <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span>100% Lossless Raw Quality (Best possible clarity, zero compression artifacts)</span>
+              </div>
             )}
-
-            {/* Detail Sharpening Toggle */}
-            <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none pt-0.5">
-              <input
-                type="checkbox"
-                checked={settings.sharpnessBoost !== false}
-                onChange={(e) => onUpdateSettings({ sharpnessBoost: e.target.checked })}
-                className="rounded border-gray-300 dark:border-[#374151] text-blue-600 focus:ring-0"
-              />
-              <span>Smart Detail & Edge Sharpening (prevents upscaling blur)</span>
-            </label>
-
-            {/* Calculated Output Dimension Status */}
-            {(() => {
-              const maxDim = Math.max(image.width, image.height);
-              let mult = 1.0;
-              let label = 'Native 1:1';
-              let badgeColor = 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/40';
-
-              if (settings.enhanceTo4K || settings.resolutionMode === '4k') {
-                mult = maxDim < 3840 ? (3840 / maxDim) : 1.0;
-                label = maxDim < 3840 ? `4K Enhanced (${(mult).toFixed(1)}× Upscale)` : 'Native 4K+ Lossless';
-                badgeColor = 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800/40';
-              } else if (settings.resolutionMode === '2k') {
-                mult = maxDim < 2560 ? (2560 / maxDim) : 1.0;
-                label = maxDim < 2560 ? `2K Enhanced (${(mult).toFixed(1)}×)` : 'Native 2K+ Lossless';
-                badgeColor = 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800/40';
-              } else if (settings.resolutionMode === 'custom') {
-                mult = (settings.customScalePercent || 100) / 100;
-                label = `Custom (${settings.customScalePercent}%)`;
-              }
-
-              const targetW = Math.round(image.width * mult);
-              const targetH = Math.round(image.height * mult);
-
-              return (
-                <div className="flex items-center justify-between text-[11px] font-mono pt-1 text-gray-500 dark:text-gray-400">
-                  <span>Export Canvas:</span>
-                  <span className={`font-bold px-1.5 py-0.5 rounded border ${badgeColor}`}>
-                    {targetW} × {targetH} px • {label}
-                  </span>
-                </div>
-              );
-            })()}
           </div>
 
+          {/* Section: Calculated Output Canvas Summary */}
+          {(() => {
+            const maxDim = Math.max(image.width, image.height);
+            let mult = 1.0;
+            let label = 'Native 1:1';
+            let badgeColor =
+              'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/40';
+
+            if (settings.enhanceTo8K || settings.resolutionMode === '8k') {
+              mult = maxDim < 7680 ? 7680 / maxDim : 1.0;
+              label = maxDim < 7680 ? `8K Enhanced (${mult.toFixed(1)}×)` : 'Native 8K+ Lossless';
+              badgeColor =
+                'text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800/40';
+            } else if (settings.enhanceTo4K || settings.resolutionMode === '4k') {
+              mult = maxDim < 3840 ? 3840 / maxDim : 1.0;
+              label = maxDim < 3840 ? `4K Enhanced (${mult.toFixed(1)}×)` : 'Native 4K+ Lossless';
+              badgeColor =
+                'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800/40';
+            } else if (settings.resolutionMode === '2k') {
+              mult = maxDim < 2560 ? 2560 / maxDim : 1.0;
+              label = maxDim < 2560 ? `2K Enhanced (${mult.toFixed(1)}×)` : 'Native 2K+ Lossless';
+              badgeColor =
+                'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800/40';
+            } else if (settings.resolutionMode === 'custom') {
+              mult = (settings.customScalePercent || 100) / 100;
+              label = `Custom (${settings.customScalePercent}%)`;
+            }
+
+            const targetW = Math.round(image.width * mult);
+            const targetH = Math.round(image.height * mult);
+
+            return (
+              <div className="p-2.5 rounded-md bg-gray-100 dark:bg-[#111827] border border-gray-200 dark:border-[#374151] flex items-center justify-between text-xs font-mono">
+                <span className="text-gray-500 dark:text-gray-400">Export Dimensions:</span>
+                <span className={`font-bold px-2 py-0.5 rounded border text-[11px] ${badgeColor}`}>
+                  {targetW} × {targetH} px • {label}
+                </span>
+              </div>
+            );
+          })()}
+
           {/* Naming Options */}
-          <div className="pt-2 border-t border-gray-200 dark:border-[#374151] space-y-2">
+          <div className="pt-3 border-t border-gray-200 dark:border-[#374151] space-y-2">
             <div>
               <span className="text-xs text-gray-600 dark:text-gray-400 block mb-1">Filename Prefix</span>
               <input
                 type="text"
                 value={settings.namingPrefix}
                 onChange={(e) => onUpdateSettings({ namingPrefix: e.target.value })}
-                placeholder="e.g. image"
+                placeholder="e.g. panel"
                 className="w-full px-2.5 py-1.5 text-xs rounded bg-white dark:bg-[#111827] border border-gray-300 dark:border-[#374151] text-gray-900 dark:text-white focus:border-blue-500 outline-none font-mono"
               />
             </div>
@@ -1172,7 +1325,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   onChange={(e) => onUpdateSettings({ includeGridCoordsInName: e.target.checked })}
                   className="rounded border-gray-300 dark:border-[#374151] text-blue-600 focus:ring-0"
                 />
-                <span>Include grid coordinates (<code className="text-blue-600 dark:text-blue-400 font-mono text-[10px]">_r01_c01</code>)</span>
+                <span>
+                  Include grid coordinates (
+                  <code className="text-blue-600 dark:text-blue-400 font-mono text-[10px]">_r01_c01</code>)
+                </span>
               </label>
             )}
           </div>

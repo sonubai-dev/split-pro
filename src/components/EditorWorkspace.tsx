@@ -12,6 +12,7 @@ import {
   Images,
   Plus,
   X,
+  Zap,
 } from 'lucide-react';
 import {
   EditorSettings,
@@ -57,6 +58,7 @@ interface EditorWorkspaceProps {
   onToast: (title: string, desc?: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
   progress: ProcessingProgress;
   setProgress: React.Dispatch<React.SetStateAction<ProcessingProgress>>;
+  onBatchExportZip?: () => Promise<void>;
 }
 
 export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
@@ -78,6 +80,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
   onToast,
   progress,
   setProgress,
+  onBatchExportZip,
 }) => {
   // Mobile active tab: 'controls' | 'canvas' | 'results'
   const [mobileTab, setMobileTab] = useState<'controls' | 'canvas' | 'results'>('canvas');
@@ -114,14 +117,19 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
     setAbortController(controller);
     setIsGenerating(true);
 
-    const is4K = settings.enhanceTo4K || settings.resolutionMode === '4k';
+    const is8K = settings.enhanceTo8K || settings.resolutionMode === '8k';
+    const is4K = !is8K && (settings.enhanceTo4K || settings.resolutionMode === '4k');
 
     setProgress({
       active: true,
       current: 0,
       total: currentSlices.length,
       percentage: 0,
-      stage: is4K ? 'Enhancing to 4K Ultra-HD & Slicing Panels...' : 'Generating High-Resolution Panels...',
+      stage: is8K
+        ? 'Enhancing to 8K Ultra-HD & Slicing Panels...'
+        : is4K
+        ? 'Enhancing to 4K Ultra-HD & Slicing Panels...'
+        : 'Generating High-Resolution Panels...',
       cancellable: true,
     });
 
@@ -145,8 +153,14 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
       setIsGenerating(false);
       setProgress((prev) => ({ ...prev, active: false }));
       onToast(
-        is4K ? '4K Ultra-HD Panels Ready' : 'Panels Generated',
-        `Successfully rendered ${results.length} panels in ${is4K ? 'enhanced 4K UHD' : 'high'} resolution.`,
+        is8K
+          ? '8K Ultra-HD Panels Ready'
+          : is4K
+          ? '4K Ultra-HD Panels Ready'
+          : 'Panels Generated',
+        `Successfully rendered ${results.length} panels in ${
+          is8K ? 'enhanced 8K Ultra-HD' : is4K ? 'enhanced 4K UHD' : 'high'
+        } resolution.`,
         'success'
       );
 
@@ -284,6 +298,10 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
   }, [generatedPanels, image, currentSlices, settings, setProgress, onToast]);
 
   const handleBatchExportZip = useCallback(async () => {
+    if (onBatchExportZip) {
+      return onBatchExportZip();
+    }
+
     const listToProcess = images && images.length > 0 ? images : [image];
     if (listToProcess.length === 0) return;
 
@@ -293,7 +311,9 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
 
     const totalImages = listToProcess.length;
     const batchOutputs: BatchImageResult[] = [];
-    const is4K = settings.enhanceTo4K || settings.resolutionMode === '4k';
+    const is8K = settings.enhanceTo8K || settings.resolutionMode === '8k';
+    const is4K = !is8K && (settings.enhanceTo4K || settings.resolutionMode === '4k');
+    const resLabel = is8K ? '8K Ultra-HD' : is4K ? '4K Ultra-HD' : 'native';
 
     try {
       for (let imgIndex = 0; imgIndex < totalImages; imgIndex++) {
@@ -309,7 +329,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
           current: imgIndex + 1,
           total: totalImages,
           percentage: Math.round((imgIndex / totalImages) * 100),
-          stage: `Processing image ${imgIndex + 1} of ${totalImages}: "${currentImg.name}" (${imgSlices.length} slices, ${is4K ? '4K Ultra-HD' : 'native'})...`,
+          stage: `Processing image ${imgIndex + 1} of ${totalImages}: "${currentImg.name}" (${imgSlices.length} slices, ${resLabel})...`,
           cancellable: true,
         });
 
@@ -648,9 +668,24 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
           )}
         </div>
 
-        {/* Right side batch helper */}
-        <div className="hidden lg:flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400 font-mono shrink-0">
-          <span>Settings applied across batch</span>
+        {/* Right side batch helper & quick download all */}
+        <div className="hidden sm:flex items-center gap-2 shrink-0">
+          <span className="hidden lg:inline text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+            Settings applied across batch
+          </span>
+          <button
+            type="button"
+            disabled={isGenerating}
+            onClick={handleBatchExportZip}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-sm transition-all active:scale-95 disabled:opacity-50"
+            title="Download all slices from all images in this batch as a single ZIP archive"
+          >
+            <FileArchive className="w-3.5 h-3.5 text-amber-300" />
+            <span>Download All as Zip</span>
+            <span className="px-1 py-0.2 rounded bg-purple-800 text-[10px] font-mono font-bold">
+              {images.length}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -746,6 +781,77 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
           <span className="text-blue-600 dark:text-blue-400 font-semibold">100% LOCAL RAM</span>
         </div>
       </footer>
+
+      {/* Mobile Floating Quick Action Bar: One-Tap Export */}
+      <div className="lg:hidden bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border-t border-gray-200 dark:border-[#1F2937] px-3 py-2 flex items-center justify-between gap-2 z-40 shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="px-2 py-1 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-mono text-xs font-bold whitespace-nowrap">
+            {currentSlices.length} Slices
+          </span>
+          <span
+            className={`px-1.5 py-1 rounded text-[11px] font-mono font-bold whitespace-nowrap ${
+              settings.enhanceTo8K || settings.resolutionMode === '8k'
+                ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800'
+                : settings.enhanceTo4K || settings.resolutionMode === '4k'
+                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+                : 'bg-gray-100 dark:bg-[#1F2937] text-gray-600 dark:text-gray-400'
+            }`}
+          >
+            {settings.enhanceTo8K || settings.resolutionMode === '8k'
+              ? '8K Ultra'
+              : settings.enhanceTo4K || settings.resolutionMode === '4k'
+              ? '4K UHD'
+              : '1:1'}
+          </span>
+          {settings.contrast !== undefined && settings.contrast !== 100 && (
+            <span className="hidden sm:inline px-1.5 py-1 rounded text-[10px] font-mono bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
+              {settings.contrast}% Cont.
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          {images && images.length > 1 ? (
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={handleBatchExportZip}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-md active:scale-95 transition-all disabled:opacity-50"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-300" />
+              <span>Batch ZIP ({images.length})</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={handleDownloadZip}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md active:scale-95 transition-all disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export ZIP</span>
+            </button>
+          )}
+
+          {mobileTab !== 'results' ? (
+            <button
+              type="button"
+              onClick={() => setMobileTab('results')}
+              className="px-2.5 py-2 rounded-lg bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-700 dark:text-gray-300 font-semibold text-xs active:scale-95 transition-all"
+            >
+              View Panels
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setMobileTab('controls')}
+              className="px-2.5 py-2 rounded-lg bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-700 dark:text-gray-300 font-semibold text-xs active:scale-95 transition-all"
+            >
+              Edit Settings
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Mobile Bottom Tab Navigation */}
       <div className="lg:hidden h-14 border-t border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827] px-4 flex items-center justify-around z-40 shrink-0 transition-colors">

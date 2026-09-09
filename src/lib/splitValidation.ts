@@ -218,6 +218,7 @@ export function runAutomatedSplitTestSuite(
     panelOrder: 'row-by-row',
     outputFormat: 'png',
     quality: 95,
+    contrast: 100,
     resolutionMode: 'original',
     customScalePercent: 100,
     namingPrefix: 'slice',

@@ -244,11 +244,18 @@ export function calculateSlices(
     }
   }
 
-  // 4K Ultra-HD & Dynamic Resolution Scaling
+  // 8K, 4K Ultra-HD & Dynamic Resolution Scaling
   const maxDim = Math.max(sourceWidth, sourceHeight);
   let scaleMultiplier = 1.0;
 
-  if (settings.enhanceTo4K || settings.resolutionMode === '4k') {
+  if (settings.enhanceTo8K || settings.resolutionMode === '8k') {
+    // 8K Ultra HD target: 7680px on longest dimension
+    if (maxDim < 7680) {
+      scaleMultiplier = Number((7680 / maxDim).toFixed(4));
+    } else {
+      scaleMultiplier = 1.0;
+    }
+  } else if (settings.enhanceTo4K || settings.resolutionMode === '4k') {
     // 4K Ultra HD target: 3840px on longest dimension
     if (maxDim < 3840) {
       scaleMultiplier = Number((3840 / maxDim).toFixed(4));
@@ -350,6 +357,34 @@ export function applySharpnessEnhancement(
 }
 
 /**
+ * Applies photographic contrast adjustment to canvas context.
+ * 100 is neutral natural contrast. Range 50-150.
+ */
+function applyContrastEnhancement(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  w: number,
+  h: number,
+  contrastPercent: number
+): void {
+  if (contrastPercent === 100 || !contrastPercent) return;
+  try {
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    // Standard photographic contrast formula with center at 128
+    const contrastVal = Math.max(-100, Math.min(100, contrastPercent - 100));
+    const factor = (259 * (contrastVal + 255)) / (255 * (259 - contrastVal));
+    for (let i = 0; i < d.length; i += 4) {
+      d[i] = Math.min(255, Math.max(0, factor * (d[i] - 128) + 128));
+      d[i + 1] = Math.min(255, Math.max(0, factor * (d[i + 1] - 128) + 128));
+      d[i + 2] = Math.min(255, Math.max(0, factor * (d[i + 2] - 128) + 128));
+    }
+    ctx.putImageData(imgData, 0, 0);
+  } catch (err) {
+    console.debug('Contrast adjustment skipped:', err);
+  }
+}
+
+/**
  * Extracts high resolution panel blobs from the ORIGINAL source image.
  * Never downsamples from preview canvas; draws raw pixel rectangles at 100% fidelity.
  * Supports createImageBitmap, OffscreenCanvas (where supported), or high-DPI HTMLCanvasElement.
@@ -428,11 +463,37 @@ export async function generatePanelOutputs(
           ctx.fillRect(0, 0, dw, dh);
         }
 
+        const contrastVal = typeof settings.contrast === 'number' ? settings.contrast : 100;
+        let hardwareFilterApplied = false;
+        if (contrastVal !== 100) {
+          try {
+            (ctx as unknown as { filter?: string }).filter = `contrast(${contrastVal}%)`;
+            hardwareFilterApplied = Boolean((ctx as unknown as { filter?: string }).filter?.includes('contrast'));
+          } catch {
+            hardwareFilterApplied = false;
+          }
+        }
+
         ctx.drawImage(drawableSource, sx, sy, sw, sh, 0, 0, dw, dh);
 
-        // Apply 4K sharpness enhancement filter if active
+        // Reset filter
+        if (contrastVal !== 100 && hardwareFilterApplied) {
+          try {
+            (ctx as unknown as { filter?: string }).filter = 'none';
+          } catch {
+            // ignore
+          }
+        }
+
+        // Apply software contrast enhancement if hardware filter was not active
+        if (contrastVal !== 100 && !hardwareFilterApplied) {
+          applyContrastEnhancement(ctx, dw, dh, contrastVal);
+        }
+
+        // Apply sharpness enhancement filter if active (tuned strength for 8K/4K)
         if (settings.sharpnessBoost !== false) {
-          applySharpnessEnhancement(ctx, dw, dh, 0.18);
+          const strength = (settings.enhanceTo8K || settings.resolutionMode === '8k') ? 0.22 : 0.18;
+          applySharpnessEnhancement(ctx, dw, dh, strength);
         }
 
         blob = await offscreen.convertToBlob({
@@ -457,11 +518,37 @@ export async function generatePanelOutputs(
           ctx.fillRect(0, 0, dw, dh);
         }
 
+        const contrastVal = typeof settings.contrast === 'number' ? settings.contrast : 100;
+        let hardwareFilterApplied = false;
+        if (contrastVal !== 100) {
+          try {
+            ctx.filter = `contrast(${contrastVal}%)`;
+            hardwareFilterApplied = Boolean(ctx.filter?.includes('contrast'));
+          } catch {
+            hardwareFilterApplied = false;
+          }
+        }
+
         ctx.drawImage(drawableSource, sx, sy, sw, sh, 0, 0, dw, dh);
 
-        // Apply 4K sharpness enhancement filter if active
+        // Reset filter
+        if (contrastVal !== 100 && hardwareFilterApplied) {
+          try {
+            ctx.filter = 'none';
+          } catch {
+            // ignore
+          }
+        }
+
+        // Apply software contrast enhancement if hardware filter was not active
+        if (contrastVal !== 100 && !hardwareFilterApplied) {
+          applyContrastEnhancement(ctx, dw, dh, contrastVal);
+        }
+
+        // Apply sharpness enhancement filter if active
         if (settings.sharpnessBoost !== false) {
-          applySharpnessEnhancement(ctx, dw, dh, 0.18);
+          const strength = (settings.enhanceTo8K || settings.resolutionMode === '8k') ? 0.22 : 0.18;
+          applySharpnessEnhancement(ctx, dw, dh, strength);
         }
 
         blob = await new Promise<Blob>((resolve, reject) => {

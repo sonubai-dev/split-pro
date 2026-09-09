@@ -93,6 +93,15 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
     setEditingId(null);
   };
 
+  const is8K = panels.some(
+    (p) => (p.outputWidth && p.outputWidth >= 4000) || (p.outputHeight && p.outputHeight >= 4000)
+  );
+  const is4K =
+    !is8K &&
+    panels.some(
+      (p) => (p.outputWidth && p.outputWidth >= 2600) || (p.outputHeight && p.outputHeight >= 2600)
+    );
+
   return (
     <div className="w-full h-full flex flex-col justify-between bg-white dark:bg-[#0A0A0B] border-l border-gray-200 dark:border-[#1F2937] overflow-y-auto text-gray-700 dark:text-gray-300 transition-colors">
       {/* Top Header */}
@@ -101,9 +110,17 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-xs tracking-wider text-gray-900 dark:text-white uppercase font-mono">PANEL EXPORTS</h3>
             {panels.length > 0 && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-500" />
-                4K ENHANCED
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium flex items-center gap-1 border ${
+                  is8K
+                    ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800/50'
+                    : is4K
+                    ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/50'
+                    : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800/50'
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                {is8K ? '8K ULTRA' : is4K ? '4K UHD' : 'HD READY'}
               </span>
             )}
           </div>
@@ -121,11 +138,15 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
             <button
               type="button"
               onClick={onDownloadZip}
-              className="flex items-center justify-center gap-1 py-2 px-2 rounded text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-black shadow-sm transition-all active:scale-[0.98]"
-              title="Download 4K Ultra-HD ZIP archive with all panels"
+              className={`flex items-center justify-center gap-1 py-2 px-2 rounded text-xs font-semibold shadow-sm transition-all active:scale-[0.98] ${
+                is8K
+                  ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                  : 'bg-amber-500 hover:bg-amber-600 text-black'
+              }`}
+              title={`Download ${is8K ? '8K Ultra-HD' : is4K ? '4K Ultra-HD' : ''} ZIP archive with all panels`}
             >
               <FileArchive className="w-3.5 h-3.5" />
-              <span>4K ZIP</span>
+              <span>{is8K ? '8K ZIP' : is4K ? '4K ZIP' : 'ZIP All'}</span>
             </button>
 
             <button

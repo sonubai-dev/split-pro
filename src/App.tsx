@@ -9,7 +9,9 @@ import { ToastContainer } from './components/ToastContainer';
 import { useImageLoader } from './hooks/useImageLoader';
 import { useEditorHistory, DEFAULT_SETTINGS } from './hooks/useEditorHistory';
 import { useToast } from './hooks/useToast';
-import { ProcessingProgress } from './types';
+import { ProcessingProgress, BatchImageResult } from './types';
+import { calculateSlices, generatePanelOutputs } from './lib/imageEngine';
+import { createAndDownloadBatchZip } from './lib/exportUtils';
 
 export default function App() {
   // Theme management with localStorage persistence
@@ -155,6 +157,105 @@ export default function App() {
     }
   };
 
+  // State & handler for batch exporting all slices of all loaded images into a single ZIP archive
+  const [isExporting, setIsExporting] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleBatchExportZip = useCallback(async () => {
+    const listToProcess = images && images.length > 0 ? images : (image ? [image] : []);
+    if (listToProcess.length === 0) return;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setIsExporting(true);
+
+    const totalImages = listToProcess.length;
+    const batchOutputs: BatchImageResult[] = [];
+    const is8K = settings.enhanceTo8K || settings.resolutionMode === '8k';
+    const is4K = !is8K && (settings.enhanceTo4K || settings.resolutionMode === '4k');
+    const resLabel = is8K ? '8K Ultra-HD' : is4K ? '4K Ultra-HD' : 'native';
+
+    try {
+      for (let imgIndex = 0; imgIndex < totalImages; imgIndex++) {
+        if (controller.signal.aborted) {
+          throw new Error('Batch processing cancelled by user.');
+        }
+
+        const currentImg = listToProcess[imgIndex];
+        const imgSlices = calculateSlices(currentImg.width, currentImg.height, settings);
+
+        setProgress({
+          active: true,
+          current: imgIndex + 1,
+          total: totalImages,
+          percentage: Math.round((imgIndex / totalImages) * 100),
+          stage: `Processing image ${imgIndex + 1} of ${totalImages}: "${currentImg.name}" (${imgSlices.length} slices, ${resLabel})...`,
+          cancellable: true,
+        });
+
+        const renderedPanels = await generatePanelOutputs(
+          currentImg,
+          imgSlices,
+          settings,
+          (prog) => {
+            const currentImgFraction = (prog.percentage || 0) / 100;
+            const overallPercentage = Math.min(
+              94,
+              Math.round(((imgIndex + currentImgFraction) / totalImages) * 100)
+            );
+            setProgress((prev) => ({
+              ...prev,
+              percentage: overallPercentage,
+            }));
+          },
+          controller.signal
+        );
+
+        batchOutputs.push({
+          imageName: currentImg.name,
+          panels: renderedPanels,
+        });
+      }
+
+      // Final ZIP packaging into a single unified archive
+      setProgress({
+        active: true,
+        current: totalImages,
+        total: totalImages,
+        percentage: 95,
+        stage: `Packaging all slices from ${totalImages} images into a single ZIP archive...`,
+        cancellable: false,
+      });
+
+      const zipBase = settings.namingPrefix?.trim() || 'all_slices_batch_export';
+      const zipName = zipBase.endsWith('.zip') ? zipBase : `${zipBase}.zip`;
+
+      await createAndDownloadBatchZip(batchOutputs, zipName, (percent) => {
+        setProgress((prev) => ({
+          ...prev,
+          percentage: 95 + Math.round(percent * 0.05),
+        }));
+      });
+
+      setIsExporting(false);
+      setProgress((prev) => ({ ...prev, active: false }));
+      const totalSlices = batchOutputs.reduce((acc, item) => acc + item.panels.length, 0);
+      addToast(
+        'Batch Export Complete',
+        `Successfully saved ${totalSlices} slices from ${totalImages} images into "${zipName}".`,
+        'success'
+      );
+    } catch (err: any) {
+      setIsExporting(false);
+      setProgress((prev) => ({ ...prev, active: false }));
+      if (err?.message !== 'Batch processing cancelled by user.') {
+        addToast('Batch Export Failed', err?.message || 'Could not export batch.', 'error');
+      } else {
+        addToast('Export Cancelled', 'Batch processing was cancelled.', 'info');
+      }
+    }
+  }, [images, image, settings, setProgress, addToast]);
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans transition-colors selection:bg-emerald-500 selection:text-white">
       {/* Hidden file input for programmatically opening file picker */}
@@ -167,7 +268,7 @@ export default function App() {
         onChange={handleFileInputChange}
       />
 
-      {/* Main Header */}
+      {/* Main Header with dedicated Download All as Zip button */}
       <AppHeader
         theme={theme}
         toggleTheme={toggleTheme}
@@ -175,6 +276,8 @@ export default function App() {
         hasImage={!!image}
         batchCount={images.length}
         onNewImage={handleTriggerUpload}
+        onDownloadAllZip={handleBatchExportZip}
+        isExporting={isExporting}
         hasPanels={false}
         onGoHome={clearImage}
       />
@@ -211,6 +314,7 @@ export default function App() {
             onToast={addToast}
             progress={progress}
             setProgress={setProgress}
+            onBatchExportZip={handleBatchExportZip}
           />
         )}
       </main>
@@ -219,6 +323,7 @@ export default function App() {
       <ProcessingModal
         progress={progress}
         onCancel={() => {
+          abortControllerRef.current?.abort();
           setProgress((prev) => ({ ...prev, active: false }));
         }}
       />

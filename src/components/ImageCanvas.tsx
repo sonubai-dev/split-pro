@@ -109,6 +109,54 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
     }
   };
 
+  // Touch handlers for mobile pan & pinch-to-zoom
+  const touchStartDistRef = useRef<number | null>(null);
+  const touchStartZoomRef = useRef<number>(1);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (draggingLine) return;
+    if (e.touches.length === 1) {
+      setIsPanning(true);
+      setStartPan({
+        x: e.touches[0].clientX - pan.x,
+        y: e.touches[0].clientY - pan.y,
+      });
+      touchStartDistRef.current = null;
+    } else if (e.touches.length === 2) {
+      setIsPanning(false);
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchStartDistRef.current = dist;
+      touchStartZoomRef.current = zoom;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 1 && isPanning) {
+      const clientX = e.touches[0].clientX;
+      const clientY = e.touches[0].clientY;
+      setPan({
+        x: clientX - startPan.x,
+        y: clientY - startPan.y,
+      });
+    } else if (e.touches.length === 2 && touchStartDistRef.current) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scale = dist / touchStartDistRef.current;
+      const nextZoom = Math.max(0.1, Math.min(5.0, touchStartZoomRef.current * scale));
+      setZoom(Math.round(nextZoom * 100) / 100);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsPanning(false);
+    touchStartDistRef.current = null;
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isPanning && !draggingLine) return;
 
@@ -261,8 +309,12 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onDoubleClick={handleCanvasDoubleClick}
-      className={`relative w-full h-full min-h-[460px] flex items-center justify-center overflow-hidden bg-gray-100 dark:bg-[#050505] select-none ${
+      className={`relative w-full h-full min-h-[460px] flex items-center justify-center overflow-hidden bg-gray-100 dark:bg-[#050505] select-none touch-none ${
         isPanning ? 'cursor-grabbing' : 'cursor-grab'
       }`}
       style={{
@@ -286,6 +338,30 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
           </span>
           <span className="text-gray-300 dark:text-gray-600">|</span>
           <span className="text-blue-600 dark:text-blue-400 font-semibold">{slices.length} PANELS</span>
+          {Boolean(settings.enhanceTo8K || settings.resolutionMode === '8k') && (
+            <>
+              <span className="text-gray-300 dark:text-gray-600">|</span>
+              <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold border border-purple-500/20 text-[10px]">
+                8K ULTRA
+              </span>
+            </>
+          )}
+          {Boolean((settings.enhanceTo4K || settings.resolutionMode === '4k') && !settings.enhanceTo8K && settings.resolutionMode !== '8k') && (
+            <>
+              <span className="text-gray-300 dark:text-gray-600">|</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[10px]">
+                4K UHD
+              </span>
+            </>
+          )}
+          {settings.contrast !== undefined && settings.contrast !== 100 && (
+            <>
+              <span className="text-gray-300 dark:text-gray-600">|</span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/20 text-[10px]">
+                CONTRAST {settings.contrast}%
+              </span>
+            </>
+          )}
         </div>
 
         {/* Right Zoom & View Controls */}
@@ -401,8 +477,13 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
             src={image.url}
             alt={image.name}
             draggable={false}
-            className="w-full h-full object-contain pointer-events-none block"
-            style={{ imageRendering: zoom > 2 ? 'pixelated' : 'auto' }}
+            className="w-full h-full object-contain pointer-events-none block transition-[filter] duration-150"
+            style={{
+              imageRendering: zoom > 2 ? 'pixelated' : 'auto',
+              filter: (settings.contrast !== undefined && settings.contrast !== 100)
+                ? `contrast(${settings.contrast}%)`
+                : undefined,
+            }}
           />
 
           {/* Slices & Overlays Layer */}
