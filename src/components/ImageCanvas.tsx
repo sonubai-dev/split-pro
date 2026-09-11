@@ -154,36 +154,7 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
     }
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 1 && isPanning) {
-      const clientX = e.touches[0].clientX;
-      const clientY = e.touches[0].clientY;
-      setPan({
-        x: clientX - startPan.x,
-        y: clientY - startPan.y,
-      });
-    } else if (e.touches.length === 2 && touchStartDistRef.current) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      const scale = dist / touchStartDistRef.current;
-      const nextZoom = Math.max(0.1, Math.min(5.0, touchStartZoomRef.current * scale));
-      setZoom(Math.round(nextZoom * 100) / 100);
-    }
-  };
-
-  const handleTouchEnd = () => {
-    setIsPanning(false);
-    touchStartDistRef.current = null;
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isPanning && !draggingLine) return;
-
-    const clientX = e.clientX;
-    const clientY = e.clientY;
-
+  const processMove = (clientX: number, clientY: number) => {
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
     }
@@ -263,6 +234,31 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
         }
       }
     });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 1 && (isPanning || draggingLine)) {
+      processMove(e.touches[0].clientX, e.touches[0].clientY);
+    } else if (e.touches.length === 2 && touchStartDistRef.current) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scale = dist / touchStartDistRef.current;
+      const nextZoom = Math.max(0.1, Math.min(5.0, touchStartZoomRef.current * scale));
+      setZoom(Math.round(nextZoom * 100) / 100);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsPanning(false);
+    setDraggingLine(null);
+    touchStartDistRef.current = null;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning && !draggingLine) return;
+    processMove(e.clientX, e.clientY);
   };
 
   const handleMouseUp = () => {
@@ -601,7 +597,7 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                   <div
                     key={`v_${idx}`}
                     style={{ left: `${screenX}px` }}
-                    className="absolute top-0 bottom-0 pointer-events-auto group cursor-col-resize z-30"
+                    className="absolute top-0 bottom-0 pointer-events-auto group cursor-col-resize z-30 w-10 -ml-5 flex justify-center"
                     onMouseEnter={() => setHoveredLine({ orientation: 'vertical', index: idx })}
                     onMouseLeave={() => setHoveredLine(null)}
                     onMouseDown={(e) => {
@@ -612,20 +608,28 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                         initialPos: vPos,
                       });
                     }}
+                    onTouchStart={(e) => {
+                      e.stopPropagation();
+                      setDraggingLine({
+                        orientation: 'vertical',
+                        index: idx,
+                        initialPos: vPos,
+                      });
+                    }}
                   >
                     {/* Visual Line */}
                     <div
-                      className={`w-[2px] h-full -ml-[1px] transition-colors ${
+                      className={`w-[2px] h-full transition-colors ${
                         isDragging || isHovered ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.5)]'
                       }`}
                     />
 
                     {/* Drag Handle & Tooltip */}
-                    <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
-                      <div className="w-5 h-7 rounded bg-[#111827] border border-amber-400 flex items-center justify-center shadow-lg text-amber-400 cursor-col-resize">
-                        <Move className="w-3 h-3 rotate-90" />
+                    <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
+                      <div className="w-8 h-10 rounded bg-[#111827] border border-amber-400 flex items-center justify-center shadow-lg text-amber-400 cursor-col-resize active:scale-95 transition-transform">
+                        <Move className="w-4 h-4 rotate-90" />
                       </div>
-                      <div className="px-1.5 py-0.5 rounded bg-[#111827]/90 text-amber-300 font-mono text-[9px] border border-[#374151] shadow-md whitespace-nowrap">
+                      <div className="hidden sm:block px-1.5 py-0.5 rounded bg-[#111827]/90 text-amber-300 font-mono text-[9px] border border-[#374151] shadow-md whitespace-nowrap">
                         X: {Math.round(vPos)}px ({Math.round((vPos / image.width) * 100)}%)
                       </div>
                       <button
@@ -634,10 +638,15 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                           e.stopPropagation();
                           handleDeleteCustomLine('vertical', idx);
                         }}
-                        className="p-1 rounded bg-red-600 hover:bg-red-500 text-white shadow-md transition-transform hover:scale-110"
+                        onTouchEnd={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleDeleteCustomLine('vertical', idx);
+                        }}
+                        className="p-2 sm:p-1 rounded bg-red-600 hover:bg-red-500 text-white shadow-md transition-transform hover:scale-110 active:scale-95"
                         title="Delete this split line"
                       >
-                        <Trash2 className="w-2.5 h-2.5" />
+                        <Trash2 className="w-4 h-4 sm:w-2.5 sm:h-2.5" />
                       </button>
                     </div>
                   </div>
@@ -656,7 +665,7 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                   <div
                     key={`h_${idx}`}
                     style={{ top: `${screenY}px` }}
-                    className="absolute left-0 right-0 pointer-events-auto group cursor-row-resize z-30"
+                    className="absolute left-0 right-0 pointer-events-auto group cursor-row-resize z-30 h-10 -mt-5 flex flex-col justify-center"
                     onMouseEnter={() => setHoveredLine({ orientation: 'horizontal', index: idx })}
                     onMouseLeave={() => setHoveredLine(null)}
                     onMouseDown={(e) => {
@@ -667,20 +676,28 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                         initialPos: hPos,
                       });
                     }}
+                    onTouchStart={(e) => {
+                      e.stopPropagation();
+                      setDraggingLine({
+                        orientation: 'horizontal',
+                        index: idx,
+                        initialPos: hPos,
+                      });
+                    }}
                   >
                     {/* Visual Line */}
                     <div
-                      className={`h-[2px] w-full -mt-[1px] transition-colors ${
+                      className={`h-[2px] w-full transition-colors ${
                         isDragging || isHovered ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.5)]'
                       }`}
                     />
 
                     {/* Drag Handle & Tooltip */}
-                    <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                      <div className="w-7 h-5 rounded bg-[#111827] border border-amber-400 flex items-center justify-center shadow-lg text-amber-400 cursor-row-resize">
-                        <Move className="w-3 h-3" />
+                    <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                      <div className="w-10 h-8 rounded bg-[#111827] border border-amber-400 flex items-center justify-center shadow-lg text-amber-400 cursor-row-resize active:scale-95 transition-transform">
+                        <Move className="w-4 h-4" />
                       </div>
-                      <div className="px-1.5 py-0.5 rounded bg-[#111827]/90 text-amber-300 font-mono text-[9px] border border-[#374151] shadow-md whitespace-nowrap">
+                      <div className="hidden sm:block px-1.5 py-0.5 rounded bg-[#111827]/90 text-amber-300 font-mono text-[9px] border border-[#374151] shadow-md whitespace-nowrap">
                         Y: {Math.round(hPos)}px ({Math.round((hPos / image.height) * 100)}%)
                       </div>
                       <button
@@ -689,10 +706,15 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                           e.stopPropagation();
                           handleDeleteCustomLine('horizontal', idx);
                         }}
-                        className="p-1 rounded bg-red-600 hover:bg-red-500 text-white shadow-md transition-transform hover:scale-110"
+                        onTouchEnd={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleDeleteCustomLine('horizontal', idx);
+                        }}
+                        className="p-2 sm:p-1 rounded bg-red-600 hover:bg-red-500 text-white shadow-md transition-transform hover:scale-110 active:scale-95"
                         title="Delete this split line"
                       >
-                        <Trash2 className="w-2.5 h-2.5" />
+                        <Trash2 className="w-4 h-4 sm:w-2.5 sm:h-2.5" />
                       </button>
                     </div>
                   </div>

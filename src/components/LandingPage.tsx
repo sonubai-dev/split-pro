@@ -462,24 +462,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </span>
             </div>
           </div>
-
-          <div className="flex items-center gap-4 text-xs font-medium">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              Upload Image
-            </button>
-            <span className="text-gray-300 dark:text-gray-700">•</span>
-            <button
-              type="button"
-              onClick={onPasteRequested}
-              className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              Paste from Clipboard
-            </button>
-          </div>
         </div>
       </footer>
     </div>
