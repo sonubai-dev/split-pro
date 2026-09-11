@@ -23,6 +23,8 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   enhanceTo8K: false,
   enhanceTo4K: true,
   sharpnessBoost: true,
+  sharpnessLevel: 'ultra',
+  clarityBoost: true,
   customScalePercent: 100,
   namingPrefix: 'panel',
   includeGridCoordsInName: false,

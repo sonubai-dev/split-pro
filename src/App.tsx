@@ -6,9 +6,11 @@ import { ProcessingModal } from './components/ProcessingModal';
 import { LargeImageModal } from './components/LargeImageModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { ToastContainer } from './components/ToastContainer';
+import { RecentExportsDrawer } from './components/RecentExportsDrawer';
 import { useImageLoader } from './hooks/useImageLoader';
 import { useEditorHistory, DEFAULT_SETTINGS } from './hooks/useEditorHistory';
 import { useToast } from './hooks/useToast';
+import { useRecentExports } from './hooks/useRecentExports';
 import { ProcessingProgress, BatchImageResult } from './types';
 import { calculateSlices, generatePanelOutputs } from './lib/imageEngine';
 import { createAndDownloadBatchZip } from './lib/exportUtils';
@@ -38,6 +40,8 @@ export default function App() {
 
   // Modal states
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [isRecentExportsOpen, setIsRecentExportsOpen] = useState(false);
+  const { recentExports, addRecentExport, clearRecentExports } = useRecentExports();
   const [progress, setProgress] = useState<ProcessingProgress>({
     active: false,
     current: 0,
@@ -245,6 +249,7 @@ export default function App() {
         `Successfully saved ${totalSlices} slices from ${totalImages} images into "${zipName}".`,
         'success'
       );
+      addRecentExport({ filename: zipName, count: totalImages });
     } catch (err: any) {
       setIsExporting(false);
       setProgress((prev) => ({ ...prev, active: false }));
@@ -273,6 +278,7 @@ export default function App() {
         theme={theme}
         toggleTheme={toggleTheme}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
+        onOpenRecentExports={() => setIsRecentExportsOpen(true)}
         hasImage={!!image}
         batchCount={images.length}
         onNewImage={handleTriggerUpload}
@@ -312,6 +318,7 @@ export default function App() {
             onReplaceImage={handleTriggerUpload}
             onRemoveImage={clearImage}
             onToast={addToast}
+            onExportSuccess={addRecentExport}
             progress={progress}
             setProgress={setProgress}
             onBatchExportZip={handleBatchExportZip}
@@ -346,6 +353,14 @@ export default function App() {
 
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {/* Recent Exports Sidebar/Drawer */}
+      <RecentExportsDrawer
+        isOpen={isRecentExportsOpen}
+        onClose={() => setIsRecentExportsOpen(false)}
+        recentExports={recentExports}
+        onClear={clearRecentExports}
+      />
     </div>
   );
 }

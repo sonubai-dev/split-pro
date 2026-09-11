@@ -65,6 +65,8 @@ export interface EditorSettings {
   enhanceTo8K?: boolean; // Automatically scale and enhance up to 8K Ultra-HD (7680px)
   enhanceTo4K?: boolean; // Automatically enhance quality up to 4K on upload & export
   sharpnessBoost?: boolean; // Unsharp edge enhancement for ultra-crisp details
+  sharpnessLevel?: 'off' | 'subtle' | 'crisp' | 'ultra'; // Configurable sharpness level
+  clarityBoost?: boolean; // Micro-contrast edge clarity enhancement (removes haze, sharpens textures)
   customScalePercent: number; // e.g. 100, 75, 50, 200
   customWidth?: number;
   customHeight?: number;

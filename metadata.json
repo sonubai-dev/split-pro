@@ -1,6 +1,6 @@
 {
   "name": "Split Pro",
-  "description": "Professional browser-based image splitting tool for slicing high-resolution images into grids, vertical, horizontal, or custom panel layouts with lossless quality export.",
+  "description": "Professional browser-based image splitting tool by SOLITA SOLUTIONS for slicing high-resolution images into grids, vertical, horizontal, or custom panel layouts with lossless quality export.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

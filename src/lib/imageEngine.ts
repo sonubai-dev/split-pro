@@ -308,15 +308,19 @@ export function calculateSlices(
 }
 
 /**
- * Applies high-frequency detail enhancement and edge sharpening to canvas slices.
- * Ensures upscaled 4K imagery looks sharp and defined instead of soft or blurry.
+ * Advanced Multi-Scale Unsharp Mask & High-Frequency Detail Engine.
+ * Ensures output slices are razor-sharp, distinct, and crystal clear.
+ * Adapts convolution radius and weight depending on resolution (e.g. 4K, 8K, or native).
  */
 export function applySharpnessEnhancement(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   width: number,
   height: number,
-  strength: number = 0.18
+  level: 'off' | 'subtle' | 'crisp' | 'ultra' = 'ultra',
+  isHighRes: boolean = false
 ): void {
+  if (level === 'off') return;
+
   try {
     const imgData = ctx.getImageData(0, 0, width, height);
     const src = imgData.data;
@@ -324,28 +328,52 @@ export function applySharpnessEnhancement(
     const w = width;
     const h = height;
 
-    const a = Math.max(0.05, Math.min(0.4, strength));
+    // Determine sharpening strength based on level
+    let strength = 0.35; // 'ultra' default
+    if (level === 'subtle') strength = 0.16;
+    else if (level === 'crisp') strength = 0.26;
+    else if (level === 'ultra') strength = 0.42;
+
+    if (isHighRes) {
+      strength = Math.min(0.55, strength * 1.25);
+    }
+
+    // Adaptive step distance for higher resolutions (1px, 2px, or 3px radius)
+    // Ensures sharpness doesn't vanish on huge 4K or 8K canvases
+    const maxDim = Math.max(w, h);
+    const step = maxDim >= 5000 ? 2 : 1;
+
+    const a = Math.max(0.08, Math.min(0.55, strength));
     const center = 1 + 4 * a;
 
-    // Process interior pixels with 3x3 unsharp convolution
-    for (let y = 1; y < h - 1; y++) {
-      const rowPrev = (y - 1) * w;
-      const rowCurr = y * w;
-      const rowNext = (y + 1) * w;
+    // Threshold below which subtle gradient changes are preserved without noise amplification
+    const threshold = 3;
 
-      for (let x = 1; x < w - 1; x++) {
+    for (let y = step; y < h - step; y++) {
+      const rowPrev = (y - step) * w;
+      const rowCurr = y * w;
+      const rowNext = (y + step) * w;
+
+      for (let x = step; x < w - step; x++) {
         const i = (rowCurr + x) << 2;
         const top = (rowPrev + x) << 2;
         const bottom = (rowNext + x) << 2;
-        const left = (rowCurr + (x - 1)) << 2;
-        const right = (rowCurr + (x + 1)) << 2;
+        const left = (rowCurr + (x - step)) << 2;
+        const right = (rowCurr + (x + step)) << 2;
 
-        // Red
-        src[i] = center * dst[i] - a * (dst[top] + dst[bottom] + dst[left] + dst[right]);
-        // Green
-        src[i + 1] = center * dst[i + 1] - a * (dst[top + 1] + dst[bottom + 1] + dst[left + 1] + dst[right + 1]);
-        // Blue
-        src[i + 2] = center * dst[i + 2] - a * (dst[top + 2] + dst[bottom + 2] + dst[left + 2] + dst[right + 2]);
+        // Process R, G, B channels with edge thresholding
+        for (let c = 0; c < 3; c++) {
+          const orig = dst[i + c];
+          const neighborAvg = (dst[top + c] + dst[bottom + c] + dst[left + c] + dst[right + c]) * 0.25;
+          const diff = orig - neighborAvg;
+
+          // Only sharpen if difference exceeds noise threshold
+          if (Math.abs(diff) >= threshold) {
+            src[i + c] = Math.min(255, Math.max(0, orig + diff * (a * 4)));
+          } else {
+            src[i + c] = orig;
+          }
+        }
       }
     }
 
@@ -353,6 +381,44 @@ export function applySharpnessEnhancement(
   } catch (err) {
     // If context doesn't support reading or is tainted, silently skip
     console.debug('Sharpness enhancement skipped:', err);
+  }
+}
+
+/**
+ * Applies micro-contrast clarity enhancement.
+ * De-hazes muddy textures and accentuates mid-tone edge definition,
+ * creating clean, punchy, crystal-clear imagery without blown highlights.
+ */
+export function applyClarityEnhancement(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  w: number,
+  h: number,
+  clarityAmount: number = 0.18
+): void {
+  try {
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    const len = d.length;
+
+    // Precalculate S-curve LUT for mid-tone micro-contrast enhancement
+    const lut = new Uint8ClampedArray(256);
+    for (let i = 0; i < 256; i++) {
+      const normalized = i / 255;
+      // Smooth Hermite S-curve centered around mid-gray (0.5)
+      // Boosts separation in 20%-80% luminance range while tapering near 0% (black) and 100% (white)
+      const delta = Math.sin((normalized - 0.5) * Math.PI) * clarityAmount * 28;
+      lut[i] = Math.min(255, Math.max(0, Math.round(i + delta)));
+    }
+
+    for (let i = 0; i < len; i += 4) {
+      d[i] = lut[d[i]];
+      d[i + 1] = lut[d[i + 1]];
+      d[i + 2] = lut[d[i + 2]];
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  } catch (err) {
+    console.debug('Clarity enhancement skipped:', err);
   }
 }
 
@@ -490,10 +556,18 @@ export async function generatePanelOutputs(
           applyContrastEnhancement(ctx, dw, dh, contrastVal);
         }
 
-        // Apply sharpness enhancement filter if active (tuned strength for 8K/4K)
-        if (settings.sharpnessBoost !== false) {
-          const strength = (settings.enhanceTo8K || settings.resolutionMode === '8k') ? 0.22 : 0.18;
-          applySharpnessEnhancement(ctx, dw, dh, strength);
+        const is8K = Boolean(settings.enhanceTo8K || settings.resolutionMode === '8k');
+        const is4K = Boolean(!is8K && (settings.enhanceTo4K || settings.resolutionMode === '4k'));
+        const sharpnessMode = settings.sharpnessLevel || (settings.sharpnessBoost === false ? 'off' : 'ultra');
+
+        // Apply multi-scale unsharp mask sharpness enhancement
+        if (settings.sharpnessBoost !== false && sharpnessMode !== 'off') {
+          applySharpnessEnhancement(ctx, dw, dh, sharpnessMode, is8K || is4K);
+        }
+
+        // Apply micro-contrast clarity enhancement to eliminate haze and ensure crystal-clear output
+        if (settings.clarityBoost !== false && sharpnessMode !== 'off') {
+          applyClarityEnhancement(ctx, dw, dh, sharpnessMode === 'ultra' ? 0.22 : 0.16);
         }
 
         blob = await offscreen.convertToBlob({
@@ -545,10 +619,18 @@ export async function generatePanelOutputs(
           applyContrastEnhancement(ctx, dw, dh, contrastVal);
         }
 
-        // Apply sharpness enhancement filter if active
-        if (settings.sharpnessBoost !== false) {
-          const strength = (settings.enhanceTo8K || settings.resolutionMode === '8k') ? 0.22 : 0.18;
-          applySharpnessEnhancement(ctx, dw, dh, strength);
+        const is8K = Boolean(settings.enhanceTo8K || settings.resolutionMode === '8k');
+        const is4K = Boolean(!is8K && (settings.enhanceTo4K || settings.resolutionMode === '4k'));
+        const sharpnessMode = settings.sharpnessLevel || (settings.sharpnessBoost === false ? 'off' : 'ultra');
+
+        // Apply multi-scale unsharp mask sharpness enhancement
+        if (settings.sharpnessBoost !== false && sharpnessMode !== 'off') {
+          applySharpnessEnhancement(ctx, dw, dh, sharpnessMode, is8K || is4K);
+        }
+
+        // Apply micro-contrast clarity enhancement to eliminate haze and ensure crystal-clear output
+        if (settings.clarityBoost !== false && sharpnessMode !== 'off') {
+          applyClarityEnhancement(ctx, dw, dh, sharpnessMode === 'ultra' ? 0.22 : 0.16);
         }
 
         blob = await new Promise<Blob>((resolve, reject) => {

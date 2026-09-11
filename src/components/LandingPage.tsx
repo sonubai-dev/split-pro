@@ -96,7 +96,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="text-center max-w-3xl mx-auto mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded text-xs font-mono font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40 mb-6">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>SPLIT PRO IMAGE SLICING ENGINE</span>
+            <span>SPLIT PRO • BY SOLITA SOLUTIONS</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-gray-900 dark:text-white leading-[1.15] mb-6">
@@ -368,13 +368,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="w-7 h-7 bg-blue-600 rounded flex items-center justify-center font-bold text-white text-sm shadow-sm">
               S
             </div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold tracking-tight text-gray-900 dark:text-white">
-                Split Pro
-              </span>
-              <span className="text-gray-300 dark:text-gray-700">•</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                High-Quality Image Slicing & Grid Tool
+            <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-bold tracking-tight text-gray-900 dark:text-white">
+                  Split Pro
+                </span>
+                <span className="text-gray-300 dark:text-gray-700">•</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  By <strong className="font-semibold text-gray-700 dark:text-gray-300">SOLITA SOLUTIONS</strong>
+                </span>
+              </div>
+              <span className="hidden sm:inline text-gray-300 dark:text-gray-700">•</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                Lossless Image Slicing & Panel Grid Studio
               </span>
             </div>
           </div>

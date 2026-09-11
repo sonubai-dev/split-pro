@@ -9,12 +9,14 @@ import {
   Download,
   FileArchive,
   Sparkles,
+  History,
 } from 'lucide-react';
 
 interface AppHeaderProps {
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   onOpenShortcuts: () => void;
+  onOpenRecentExports?: () => void;
   hasImage: boolean;
   batchCount?: number;
   onNewImage: () => void;
@@ -29,6 +31,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   theme,
   toggleTheme,
   onOpenShortcuts,
+  onOpenRecentExports,
   hasImage,
   batchCount,
   onNewImage,
@@ -47,22 +50,23 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           onClick={onGoHome}
           className="flex items-center gap-3 cursor-pointer group"
         >
-          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-white text-base shadow-sm shadow-blue-900/30 group-hover:bg-blue-500 transition-colors">
+          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-white text-base shadow-sm shadow-blue-900/30 group-hover:bg-blue-500 transition-colors shrink-0">
             S
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-base sm:text-lg font-bold tracking-tight text-gray-900 dark:text-white">
-              SPLIT<span className="text-blue-600 dark:text-blue-500 underline underline-offset-4 decoration-2">PRO</span>
+          <div className="flex flex-col">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base sm:text-lg font-bold tracking-tight text-gray-900 dark:text-white">
+                SPLIT<span className="text-blue-600 dark:text-blue-500 underline underline-offset-4 decoration-2">PRO</span>
+              </span>
+              {batchCount && batchCount > 1 ? (
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  {batchCount} IMAGES
+                </span>
+              ) : null}
+            </div>
+            <span className="text-[9px] font-medium tracking-wider uppercase text-gray-400 dark:text-gray-500 -mt-0.5">
+              by <span className="font-semibold text-gray-700 dark:text-gray-300">SOLITA SOLUTIONS</span>
             </span>
-            {batchCount && batchCount > 1 ? (
-              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                {batchCount} IMAGES
-              </span>
-            ) : (
-              <span className="hidden sm:inline text-[9px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151]">
-                Minimal
-              </span>
-            )}
           </div>
         </div>
 
@@ -120,6 +124,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 </button>
               )}
             </>
+          )}
+
+          {/* Recent Exports Trigger */}
+          {onOpenRecentExports && (
+            <button
+              id="btn-header-recent"
+              type="button"
+              onClick={onOpenRecentExports}
+              aria-label="Recent Exports"
+              className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1F2937] border border-transparent hover:border-gray-200 dark:hover:border-[#374151] transition-colors"
+              title="Recent Exports"
+            >
+              <History className="w-4 h-4" />
+            </button>
           )}
 
           {/* Keyboard Shortcuts Trigger */}

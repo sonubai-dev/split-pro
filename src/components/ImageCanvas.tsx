@@ -362,6 +362,14 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
               </span>
             </>
           )}
+          {Boolean(settings.sharpnessBoost !== false && settings.sharpnessLevel !== 'off') && (
+            <>
+              <span className="text-gray-300 dark:text-gray-600">|</span>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20 text-[10px] flex items-center gap-1">
+                SHARP & CLEAR
+              </span>
+            </>
+          )}
         </div>
 
         {/* Right Zoom & View Controls */}

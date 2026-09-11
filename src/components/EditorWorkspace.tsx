@@ -56,6 +56,7 @@ interface EditorWorkspaceProps {
   onReplaceImage: () => void;
   onRemoveImage: () => void;
   onToast: (title: string, desc?: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
+  onExportSuccess?: (info: { filename: string; count: number }) => void;
   progress: ProcessingProgress;
   setProgress: React.Dispatch<React.SetStateAction<ProcessingProgress>>;
   onBatchExportZip?: () => Promise<void>;
@@ -78,6 +79,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
   onReplaceImage,
   onRemoveImage,
   onToast,
+  onExportSuccess,
   progress,
   setProgress,
   onBatchExportZip,
@@ -290,12 +292,13 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
       setIsGenerating(false);
       setProgress((prev) => ({ ...prev, active: false }));
       onToast('ZIP Exported', `Saved ${zipName}`, 'success');
+      onExportSuccess?.({ filename: zipName, count: panelsToZip.length });
     } catch (e) {
       setIsGenerating(false);
       setProgress((prev) => ({ ...prev, active: false }));
       onToast('ZIP Failed', 'Could not create archive.', 'error');
     }
-  }, [generatedPanels, image, currentSlices, settings, setProgress, onToast]);
+  }, [generatedPanels, image, currentSlices, settings, setProgress, onToast, onExportSuccess]);
 
   const handleBatchExportZip = useCallback(async () => {
     if (onBatchExportZip) {
@@ -806,6 +809,18 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
           {settings.contrast !== undefined && settings.contrast !== 100 && (
             <span className="hidden sm:inline px-1.5 py-1 rounded text-[10px] font-mono bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
               {settings.contrast}% Cont.
+            </span>
+          )}
+          {Boolean(settings.sharpnessBoost !== false && settings.sharpnessLevel !== 'off') && (
+            <span
+              onClick={() => onUpdateSettings((prev) => ({
+                sharpnessBoost: prev.sharpnessBoost === false ? true : prev.sharpnessLevel === 'off' ? true : prev.sharpnessBoost,
+                sharpnessLevel: prev.sharpnessLevel === 'ultra' ? 'crisp' : 'ultra'
+              }))}
+              className="px-1.5 py-1 rounded text-[10px] font-mono bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold cursor-pointer select-none"
+              title="Click to toggle sharpness level"
+            >
+              Sharp {settings.sharpnessLevel === 'ultra' ? '★' : '✓'}
             </span>
           )}
         </div>

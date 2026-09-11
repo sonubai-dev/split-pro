@@ -110,18 +110,23 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-xs tracking-wider text-gray-900 dark:text-white uppercase font-mono">PANEL EXPORTS</h3>
             {panels.length > 0 && (
-              <span
-                className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium flex items-center gap-1 border ${
-                  is8K
-                    ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800/50'
-                    : is4K
-                    ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/50'
-                    : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800/50'
-                }`}
-              >
-                <Sparkles className="w-3 h-3" />
-                {is8K ? '8K ULTRA' : is4K ? '4K UHD' : 'HD READY'}
-              </span>
+              <>
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium flex items-center gap-1 border ${
+                    is8K
+                      ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800/50'
+                      : is4K
+                      ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/50'
+                      : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800/50'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {is8K ? '8K ULTRA' : is4K ? '4K UHD' : 'HD READY'}
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hidden sm:inline-block">
+                  SHARP & CLEAR
+                </span>
+              </>
             )}
           </div>
 

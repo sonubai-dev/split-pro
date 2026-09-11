@@ -69,6 +69,10 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
         >
           Got it
         </button>
+
+        <div className="pt-1 text-center text-[11px] text-gray-400 dark:text-gray-500">
+          Split Pro • Created by <span className="font-semibold text-gray-600 dark:text-gray-300">SOLITA SOLUTIONS</span>
+        </div>
       </div>
     </div>
   );

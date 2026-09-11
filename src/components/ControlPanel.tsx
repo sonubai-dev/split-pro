@@ -1105,16 +1105,83 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               )}
             </div>
 
-            {/* Smart Detail & Edge Sharpening Toggle */}
-            <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none pt-1">
-              <input
-                type="checkbox"
-                checked={settings.sharpnessBoost !== false}
-                onChange={(e) => onUpdateSettings({ sharpnessBoost: e.target.checked })}
-                className="rounded border-gray-300 dark:border-[#374151] text-purple-600 focus:ring-0 cursor-pointer"
-              />
-              <span>Smart Detail Sharpening (keeps cuts ultra-crisp)</span>
-            </label>
+            {/* Section: Image Sharpness & Clarity (Razor-Sharp Output) */}
+            <div className="pt-3 border-t border-gray-200 dark:border-[#374151] space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-purple-500" /> Sharpness & Clarity
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold border border-purple-500/20 uppercase">
+                  {settings.sharpnessBoost === false || settings.sharpnessLevel === 'off'
+                    ? 'Off'
+                    : settings.sharpnessLevel === 'subtle'
+                    ? 'Subtle'
+                    : settings.sharpnessLevel === 'crisp'
+                    ? 'Crisp & Clear'
+                    : 'Ultra Sharp'}
+                </span>
+              </div>
+
+              {/* 4 One-Tap Presets */}
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { id: 'ultra', label: 'Ultra', desc: 'Max Sharp' },
+                  { id: 'crisp', label: 'Crisp', desc: 'Balanced' },
+                  { id: 'subtle', label: 'Subtle', desc: 'Light' },
+                  { id: 'off', label: 'Off', desc: 'Raw 1:1' },
+                ].map((item) => {
+                  const isActive =
+                    item.id === 'off'
+                      ? settings.sharpnessBoost === false || settings.sharpnessLevel === 'off'
+                      : settings.sharpnessBoost !== false && (settings.sharpnessLevel || 'ultra') === item.id;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        if (item.id === 'off') {
+                          onUpdateSettings({ sharpnessBoost: false, sharpnessLevel: 'off' });
+                        } else {
+                          onUpdateSettings({
+                            sharpnessBoost: true,
+                            sharpnessLevel: item.id as 'subtle' | 'crisp' | 'ultra',
+                          });
+                        }
+                      }}
+                      className={`py-1.5 px-1.5 rounded text-xs font-medium transition-all text-center flex flex-col items-center justify-center ${
+                        isActive
+                          ? 'bg-purple-600 text-white font-bold shadow-sm ring-1 ring-purple-400'
+                          : 'bg-white dark:bg-[#111827] border border-gray-200 dark:border-[#374151] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1F2937]'
+                      }`}
+                    >
+                      <span className="leading-tight">{item.label}</span>
+                      <span className="text-[9px] opacity-75 font-mono leading-tight">{item.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Clarity & De-Haze Micro-Contrast Toggle */}
+              <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none pt-1">
+                <input
+                  type="checkbox"
+                  checked={settings.clarityBoost !== false}
+                  onChange={(e) => onUpdateSettings({ clarityBoost: e.target.checked })}
+                  className="rounded border-gray-300 dark:border-[#374151] text-purple-600 focus:ring-0 cursor-pointer"
+                />
+                <span className="flex-1">
+                  Micro-Contrast Clarity <span className="text-gray-400 text-[11px]">(removes haze & sharpens textures)</span>
+                </span>
+              </label>
+
+              {/* Active Sharpness & Clarity status notice */}
+              {(settings.sharpnessBoost !== false && settings.sharpnessLevel !== 'off') && (
+                <div className="p-2 rounded bg-purple-500/5 dark:bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-900 dark:text-purple-200 leading-snug">
+                  ✨ <strong>Razor-Sharp Output Active:</strong> Slices will be rendered with adaptive edge sharpening and micro-contrast clarity to ensure ultra-crisp output across all panels.
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Section: Photo Contrast & Vividness */}
