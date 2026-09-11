@@ -54,6 +54,27 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
   // RAF ref for high performance throttling
   const rafRef = useRef<number | null>(null);
 
+  // Derive grid lines for non-custom modes to draw a strong overlay
+  const derivedVLines = React.useMemo(() => {
+    if (settings.splitMode === 'custom') return [];
+    const lines = new Set<number>();
+    slices.forEach(slice => {
+      if (slice.sourceX > 0) lines.add(slice.sourceX);
+      if (slice.sourceX + slice.sourceWidth < image.width) lines.add(slice.sourceX + slice.sourceWidth);
+    });
+    return Array.from(lines);
+  }, [slices, settings.splitMode, image.width]);
+
+  const derivedHLines = React.useMemo(() => {
+    if (settings.splitMode === 'custom') return [];
+    const lines = new Set<number>();
+    slices.forEach(slice => {
+      if (slice.sourceY > 0) lines.add(slice.sourceY);
+      if (slice.sourceY + slice.sourceHeight < image.height) lines.add(slice.sourceY + slice.sourceHeight);
+    });
+    return Array.from(lines);
+  }, [slices, settings.splitMode, image.height]);
+
   // Initial fit to screen on image load
   const fitToScreen = useCallback(() => {
     if (!containerRef.current || !image) return;
@@ -542,6 +563,26 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Dynamic Grid Lines Overlay (for auto, grid, vertical, horizontal modes) */}
+          {showLines && settings.splitMode !== 'custom' && (
+            <div className="absolute inset-0 pointer-events-none z-20">
+              {derivedVLines.map((vPos, idx) => (
+                <div
+                  key={`dv_${idx}`}
+                  style={{ left: `${vPos * zoom}px` }}
+                  className="absolute top-0 bottom-0 w-[2px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] z-20 transition-all duration-200"
+                />
+              ))}
+              {derivedHLines.map((hPos, idx) => (
+                <div
+                  key={`dh_${idx}`}
+                  style={{ top: `${hPos * zoom}px` }}
+                  className="absolute left-0 right-0 h-[2px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] z-20 transition-all duration-200"
+                />
+              ))}
             </div>
           )}
 

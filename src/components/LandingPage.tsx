@@ -9,6 +9,9 @@ import {
   FileArchive,
   ChevronRight,
   Lock,
+  ImageIcon,
+  Scissors,
+  ArrowRight
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -175,6 +178,81 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </span>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Visual Diagram Concept Section */}
+      <section className="py-16 px-4 sm:px-6 max-w-5xl mx-auto border-t border-gray-200 dark:border-[#1F2937]">
+        <div className="text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-3">
+            Perfect for AI-Generated Storyboards
+          </h2>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+            Turn massive multi-panel images from ChatGPT or Midjourney into individual carousel posts seamlessly.
+          </p>
+        </div>
+
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10">
+          
+          {/* Left: Input Storyboard */}
+          <div className="flex flex-col items-center">
+            <div className="w-48 bg-white dark:bg-[#111827] rounded-lg shadow-md border-2 border-dashed border-gray-300 dark:border-[#374151] p-2.5 relative">
+              <div className="grid grid-cols-2 gap-2 opacity-80">
+                <div className="aspect-square bg-gray-100 dark:bg-[#1F2937] rounded flex items-center justify-center border border-gray-200 dark:border-[#374151]"><ImageIcon className="w-5 h-5 text-gray-400" /></div>
+                <div className="aspect-square bg-gray-100 dark:bg-[#1F2937] rounded flex items-center justify-center border border-gray-200 dark:border-[#374151]"><ImageIcon className="w-5 h-5 text-gray-400" /></div>
+                <div className="aspect-square bg-gray-100 dark:bg-[#1F2937] rounded flex items-center justify-center border border-gray-200 dark:border-[#374151]"><ImageIcon className="w-5 h-5 text-gray-400" /></div>
+                <div className="aspect-square bg-gray-100 dark:bg-[#1F2937] rounded flex items-center justify-center border border-gray-200 dark:border-[#374151]"><ImageIcon className="w-5 h-5 text-gray-400" /></div>
+                <div className="aspect-square bg-gray-100 dark:bg-[#1F2937] rounded flex items-center justify-center border border-gray-200 dark:border-[#374151]"><ImageIcon className="w-5 h-5 text-gray-400" /></div>
+                <div className="aspect-square bg-gray-100 dark:bg-[#1F2937] rounded flex items-center justify-center border border-gray-200 dark:border-[#374151]"><ImageIcon className="w-5 h-5 text-gray-400" /></div>
+              </div>
+              <div className="absolute -top-3 -left-3 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">INPUT</div>
+            </div>
+            <p className="mt-4 text-sm font-semibold text-gray-700 dark:text-gray-300 text-center">Massive AI Storyboard<br/><span className="font-normal opacity-75 text-xs">(Single Large Image)</span></p>
+          </div>
+
+          {/* Middle: Arrow & Tool */}
+          <div className="flex flex-col items-center shrink-0">
+            <div className="hidden md:flex items-center gap-3">
+              <div className="w-16 h-[2px] bg-gradient-to-r from-gray-300 to-blue-400 dark:from-[#374151] dark:to-blue-500 rounded-full relative">
+                <ArrowRight className="w-4 h-4 text-blue-500 absolute -right-1.5 -top-2" />
+              </div>
+            </div>
+            <div className="md:hidden flex flex-col items-center my-4">
+              <div className="h-10 w-[2px] bg-gradient-to-b from-gray-300 to-blue-400 dark:from-[#374151] dark:to-blue-500 rounded-full relative">
+                <ArrowRight className="w-4 h-4 text-blue-500 absolute -bottom-1.5 -left-2 rotate-90" />
+              </div>
+            </div>
+
+            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30 text-white z-10 border-4 border-white dark:border-[#0A0A0B] relative group">
+              <Scissors className="w-6 h-6" />
+              <div className="absolute -bottom-8 whitespace-nowrap font-bold text-sm text-blue-600 dark:text-blue-400">Split Pro</div>
+            </div>
+
+            <div className="hidden md:flex items-center gap-3">
+              <div className="w-16 h-[2px] bg-gradient-to-r from-blue-400 to-emerald-400 dark:from-blue-500 dark:to-emerald-500 rounded-full relative">
+                <ArrowRight className="w-4 h-4 text-emerald-500 absolute -right-1.5 -top-2" />
+              </div>
+            </div>
+            <div className="md:hidden flex flex-col items-center mt-8 mb-4">
+              <div className="h-10 w-[2px] bg-gradient-to-b from-blue-400 to-emerald-400 dark:from-blue-500 dark:to-emerald-500 rounded-full relative">
+                <ArrowRight className="w-4 h-4 text-emerald-500 absolute -bottom-1.5 -left-2 rotate-90" />
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Output Split */}
+          <div className="flex flex-col items-center">
+            <div className="flex flex-wrap gap-2.5 w-[220px] justify-center relative">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className={`w-[60px] h-[60px] bg-white dark:bg-[#111827] rounded shadow-md border border-gray-200 dark:border-[#374151] flex items-center justify-center transform transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${i % 2 === 0 ? 'rotate-3' : '-rotate-2'}`}>
+                   <ImageIcon className="w-5 h-5 text-blue-500/70" />
+                </div>
+              ))}
+              <div className="absolute -top-3 -right-3 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 z-10">OUTPUT</div>
+            </div>
+            <p className="mt-4 text-sm font-semibold text-gray-700 dark:text-gray-300 text-center">Multiple Individual Files<br/><span className="font-normal opacity-75 text-xs">(Carousel / Grid ready)</span></p>
+          </div>
+
         </div>
       </section>
 

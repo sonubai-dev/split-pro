@@ -800,7 +800,92 @@ export function formatBytes(bytes: number, decimals = 1): string {
 }
 
 /**
+ * Automatically detects picture borders using an optimized Web Worker with Sobel Edge Detection
+ * and Gaussian Blur to ensure zero UI freezing and high stability across devices.
+ */
+export async function detectPictureBordersAsync(
+  image: LoadedImage,
+  sensitivity: number = 10
+): Promise<{ vLines: number[]; hLines: number[]; detectedCount: number }> {
+  return new Promise((resolve, reject) => {
+    const width = image.width;
+    const height = image.height;
+    if (!width || !height) return resolve({ vLines: [], hLines: [], detectedCount: 0 });
+
+    const canvas = document.createElement('canvas');
+    // Scale down slightly for performance, but maintain higher fidelity than synchronous version
+    const maxDim = 800;
+    const scale = Math.min(1, maxDim / Math.max(width, height));
+    const sampleW = Math.max(10, Math.round(width * scale));
+    const sampleH = Math.max(10, Math.round(height * scale));
+    
+    canvas.width = sampleW;
+    canvas.height = sampleH;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    
+    if (!ctx) return resolve({ vLines: [], hLines: [], detectedCount: 0 });
+
+    try {
+      const drawable = image.imgElement || image.imageBitmap;
+      if (!drawable) return resolve({ vLines: [], hLines: [], detectedCount: 0 });
+
+      ctx.drawImage(drawable as CanvasImageSource, 0, 0, sampleW, sampleH);
+      const imgData = ctx.getImageData(0, 0, sampleW, sampleH);
+
+      // Import the worker dynamically
+      const BorderWorker = new Worker(new URL('../workers/borderDetector.worker.ts', import.meta.url), {
+        type: 'module'
+      });
+
+      const messageId = Math.random().toString(36).substring(7);
+
+      BorderWorker.onmessage = (e) => {
+        if (e.data.id === messageId) {
+          if (e.data.error) {
+            console.error('[BorderWorker Error]', e.data.error);
+            resolve({ vLines: [], hLines: [], detectedCount: 0 });
+          } else {
+            // Project back to original dimensions
+            const hLines = (e.data.hLines || [])
+              .map((y: number) => Math.round(y / scale))
+              .filter((y: number) => y > 10 && y < height - 10);
+              
+            const vLines = (e.data.vLines || [])
+              .map((x: number) => Math.round(x / scale))
+              .filter((x: number) => x > 10 && x < width - 10);
+
+            resolve({
+              vLines,
+              hLines,
+              detectedCount: (vLines.length + 1) * (hLines.length + 1)
+            });
+          }
+          BorderWorker.terminate();
+        }
+      };
+
+      BorderWorker.onerror = (err) => {
+        console.error('[BorderWorker Crash]', err);
+        resolve({ vLines: [], hLines: [], detectedCount: 0 });
+        BorderWorker.terminate();
+      };
+
+      BorderWorker.postMessage({
+        id: messageId,
+        imageData: imgData,
+        sensitivity
+      });
+
+    } catch (err) {
+      console.error('[detectPictureBordersAsync] Failed:', err);
+      resolve({ vLines: [], hLines: [], detectedCount: 0 });
+    }
+  });
+}
+
+/**
  * Automatically detects picture borders, panel gutters, frames, and dividers in the image.
+
  * Uses variance analysis, luminance profiling, and edge detection to find horizontal and vertical dividing lines.
  * Sensitivity ranges from 1 (coarse) to 20 (high sensitivity).
  */

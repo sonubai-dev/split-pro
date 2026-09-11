@@ -28,7 +28,7 @@ import {
   SplitMode,
 } from '../types';
 import { CREATOR_PRESETS } from '../lib/presets';
-import { calculateAutoSplitGrid, detectPictureBorders, formatBytes } from '../lib/imageEngine';
+import { calculateAutoSplitGrid, detectPictureBordersAsync, detectPictureBorders, formatBytes } from '../lib/imageEngine';
 
 interface ControlPanelProps {
   image: LoadedImage;
@@ -76,41 +76,41 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const [detectSensitivity, setDetectSensitivity] = useState<number>(10);
   const [isDetecting, setIsDetecting] = useState<boolean>(false);
 
-  const handleRunBorderDetection = (sens: number = detectSensitivity) => {
+  const handleRunBorderDetection = async (sens: number = detectSensitivity) => {
     setIsDetecting(true);
-    setTimeout(() => {
-      try {
-        const { vLines, hLines, detectedCount } = detectPictureBorders(image, sens);
-        if (vLines.length > 0 || hLines.length > 0) {
-          onUpdateSettings({
-            splitMode: 'custom',
-            customVLines: vLines,
-            customHLines: hLines,
-          });
-          onToast?.(
-            'Borders Detected',
-            `Found ${vLines.length} vertical and ${hLines.length} horizontal borders (${detectedCount} panels).`,
-            'success'
-          );
-        } else {
-          // If no high-contrast line borders, set auto split parts to sensitivity preset (1, 10, or 20)
-          const targetParts = sens <= 1 ? 1 : sens >= 20 ? 20 : 10;
-          onUpdateSettings({
-            splitMode: 'auto',
-            autoPartsCount: targetParts,
-          });
-          onToast?.(
-            'Border Detection Complete',
-            `Applied ${targetParts === 1 ? '1 full frame' : `${targetParts} auto panels`} across image.`,
-            'info'
-          );
-        }
-      } catch (err) {
-        console.error('Border detection error:', err);
-      } finally {
-        setIsDetecting(false);
+    
+    try {
+      const { vLines, hLines, detectedCount } = await detectPictureBordersAsync(image, sens);
+      
+      if (vLines.length > 0 || hLines.length > 0) {
+        onUpdateSettings({
+          splitMode: 'custom',
+          customVLines: vLines,
+          customHLines: hLines,
+        });
+        onToast?.(
+          'Borders Detected',
+          `Found ${vLines.length} vertical and ${hLines.length} horizontal borders (${detectedCount} panels).`,
+          'success'
+        );
+      } else {
+        // If no high-contrast line borders, set auto split parts to sensitivity preset (1, 10, or 20)
+        const targetParts = sens <= 1 ? 1 : sens >= 20 ? 20 : 10;
+        onUpdateSettings({
+          splitMode: 'auto',
+          autoPartsCount: targetParts,
+        });
+        onToast?.(
+          'Border Detection Complete',
+          `Applied ${targetParts === 1 ? '1 full frame' : `${targetParts} auto panels`} across image.`,
+          'info'
+        );
       }
-    }, 50);
+    } catch (err) {
+      console.error('Border detection error:', err);
+    } finally {
+      setIsDetecting(false);
+    }
   };
 
   const handleModeChange = (mode: SplitMode) => {
