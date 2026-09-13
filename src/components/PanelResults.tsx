@@ -333,11 +333,15 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
                           <span className="font-semibold text-gray-800 dark:text-gray-200">
                             {panel.outputWidth} × {panel.outputHeight} px
                           </span>
-                          {(panel.outputWidth >= 1920 || panel.outputHeight >= 1080) && (
+                          {panel.outputWidth >= 5000 || panel.outputHeight >= 4000 ? (
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold border border-purple-500/30">
+                              8K ULTRA
+                            </span>
+                          ) : panel.outputWidth >= 2600 || panel.outputHeight >= 2000 ? (
                             <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30">
                               4K UHD
                             </span>
-                          )}
+                          ) : null}
                           <span>•</span>
                           <span className="uppercase">{panel.format}</span>
                           {panel.sizeBytes && (

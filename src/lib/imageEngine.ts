@@ -246,39 +246,47 @@ export function calculateSlices(
 
   // 8K, 4K Ultra-HD & Dynamic Resolution Scaling
   const maxDim = Math.max(sourceWidth, sourceHeight);
-  let scaleMultiplier = 1.0;
+  let canvasScaleMultiplier = 1.0;
 
   if (settings.enhanceTo8K || settings.resolutionMode === '8k') {
     // 8K Ultra HD target: 7680px on longest dimension
-    if (maxDim < 7680) {
-      scaleMultiplier = Number((7680 / maxDim).toFixed(4));
-    } else {
-      scaleMultiplier = 1.0;
-    }
+    canvasScaleMultiplier = maxDim < 7680 ? Number((7680 / maxDim).toFixed(4)) : 1.0;
   } else if (settings.enhanceTo4K || settings.resolutionMode === '4k') {
     // 4K Ultra HD target: 3840px on longest dimension
-    if (maxDim < 3840) {
-      scaleMultiplier = Number((3840 / maxDim).toFixed(4));
-    } else {
-      scaleMultiplier = 1.0;
-    }
+    canvasScaleMultiplier = maxDim < 3840 ? Number((3840 / maxDim).toFixed(4)) : 1.0;
   } else if (settings.resolutionMode === '2k') {
-    if (maxDim < 2560) {
-      scaleMultiplier = Number((2560 / maxDim).toFixed(4));
-    } else {
-      scaleMultiplier = 1.0;
-    }
+    canvasScaleMultiplier = maxDim < 2560 ? Number((2560 / maxDim).toFixed(4)) : 1.0;
   } else if (settings.resolutionMode === 'custom') {
-    scaleMultiplier = Math.max(0.1, (customScalePercent || 100) / 100);
+    canvasScaleMultiplier = Math.max(0.1, (customScalePercent || 100) / 100);
   } else {
-    scaleMultiplier = 1.0;
+    canvasScaleMultiplier = 1.0;
   }
 
   const prefix = namingPrefix.trim() || 'panel';
+  const upscaleTarget = settings.upscaleTarget || 'panel';
 
   return orderedSlices.map((item, index) => {
-    const outWidth = Math.max(1, Math.round(item.sourceWidth * scaleMultiplier));
-    const outHeight = Math.max(1, Math.round(item.sourceHeight * scaleMultiplier));
+    let effectiveMultiplier = canvasScaleMultiplier;
+
+    if (upscaleTarget === 'panel') {
+      const sliceMax = Math.max(item.sourceWidth, item.sourceHeight);
+      if (settings.enhanceTo8K || settings.resolutionMode === '8k') {
+        // Enhance each split image up to 8K Ultra-HD (7680px)
+        effectiveMultiplier = sliceMax < 7680 ? Number((7680 / sliceMax).toFixed(4)) : 1.0;
+      } else if (settings.enhanceTo4K || settings.resolutionMode === '4k') {
+        // Enhance each split image up to 4K Ultra-HD (3840px)
+        effectiveMultiplier = sliceMax < 3840 ? Number((3840 / sliceMax).toFixed(4)) : 1.0;
+      } else if (settings.resolutionMode === '2k') {
+        effectiveMultiplier = sliceMax < 2560 ? Number((2560 / sliceMax).toFixed(4)) : 1.0;
+      } else if (settings.resolutionMode === 'custom') {
+        effectiveMultiplier = Math.max(0.1, (customScalePercent || 100) / 100);
+      } else {
+        effectiveMultiplier = 1.0;
+      }
+    }
+
+    const outWidth = Math.max(1, Math.round(item.sourceWidth * effectiveMultiplier));
+    const outHeight = Math.max(1, Math.round(item.sourceHeight * effectiveMultiplier));
     const padIndex = String(index + 1).padStart(2, '0');
     const ext = outputFormat === 'jpeg' ? 'jpg' : outputFormat;
 
@@ -316,7 +324,7 @@ export function applySharpnessEnhancement(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   width: number,
   height: number,
-  level: 'off' | 'subtle' | 'crisp' | 'ultra' = 'ultra',
+  level: 'off' | 'subtle' | 'crisp' | 'ultra' | 'studio8k' = 'ultra',
   isHighRes: boolean = false
 ): void {
   if (level === 'off') return;
@@ -333,9 +341,10 @@ export function applySharpnessEnhancement(
     if (level === 'subtle') strength = 0.16;
     else if (level === 'crisp') strength = 0.26;
     else if (level === 'ultra') strength = 0.42;
+    else if (level === 'studio8k') strength = 0.54;
 
     if (isHighRes) {
-      strength = Math.min(0.55, strength * 1.25);
+      strength = Math.min(0.62, strength * 1.25);
     }
 
     // Adaptive step distance for higher resolutions (1px, 2px, or 3px radius)
@@ -343,10 +352,7 @@ export function applySharpnessEnhancement(
     const maxDim = Math.max(w, h);
     const step = maxDim >= 5000 ? 2 : 1;
 
-    const a = Math.max(0.08, Math.min(0.55, strength));
-    const center = 1 + 4 * a;
-
-    // Threshold below which subtle gradient changes are preserved without noise amplification
+    const a = Math.max(0.08, Math.min(0.58, strength));
     const threshold = 3;
 
     for (let y = step; y < h - step; y++) {
@@ -379,8 +385,252 @@ export function applySharpnessEnhancement(
 
     ctx.putImageData(imgData, 0, 0);
   } catch (err) {
-    // If context doesn't support reading or is tainted, silently skip
     console.debug('Sharpness enhancement skipped:', err);
+  }
+}
+
+/**
+ * Storyboard & Comic Panel Crisp Edge Engine.
+ * Tailored specifically for storyboards, manga, animation frames, and sketches:
+ * - Directional edge contrast: reinforces pencil, ink, character silhouettes, and speech bubbles.
+ * - Flat-area preservation: suppresses noise in flat backgrounds, skies, and skin tones.
+ * - Anti-halo clamp: prevents unnatural white ringing around dark outline strokes.
+ * - Adaptive multi-scale kernel: applies dual-pass convolution (fine 1px details + 2-3px contours for 8K).
+ */
+export function applyStoryboardCrispEngine(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  width: number,
+  height: number,
+  level: 'off' | 'subtle' | 'crisp' | 'ultra' | 'studio8k' = 'ultra',
+  is8K: boolean = false
+): void {
+  if (level === 'off') return;
+
+  try {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const src = imgData.data;
+    const dst = new Uint8ClampedArray(src);
+    const w = width;
+    const h = height;
+
+    let strength = 0.38;
+    if (level === 'subtle') strength = 0.18;
+    else if (level === 'crisp') strength = 0.28;
+    else if (level === 'ultra') strength = 0.45;
+    else if (level === 'studio8k') strength = 0.56;
+
+    if (is8K) {
+      strength = Math.min(0.65, strength * 1.2);
+    }
+
+    const maxDim = Math.max(w, h);
+    const primaryStep = maxDim >= 5000 ? 2 : 1;
+    const alpha = Math.max(0.08, Math.min(0.6, strength));
+    const noiseThreshold = 4; // Ignore noise in flat regions
+
+    // Pass 1: Adaptive Edge-Directed Convolution with Anti-Halo Limiter
+    for (let y = primaryStep; y < h - primaryStep; y++) {
+      const rowPrev = (y - primaryStep) * w;
+      const rowCurr = y * w;
+      const rowNext = (y + primaryStep) * w;
+
+      for (let x = primaryStep; x < w - primaryStep; x++) {
+        const i = (rowCurr + x) << 2;
+        const top = (rowPrev + x) << 2;
+        const bottom = (rowNext + x) << 2;
+        const left = (rowCurr + (x - primaryStep)) << 2;
+        const right = (rowCurr + (x + primaryStep)) << 2;
+
+        for (let c = 0; c < 3; c++) {
+          const orig = dst[i + c];
+          const topVal = dst[top + c];
+          const botVal = dst[bottom + c];
+          const leftVal = dst[left + c];
+          const rightVal = dst[right + c];
+
+          const neighborAvg = (topVal + botVal + leftVal + rightVal) * 0.25;
+          const diff = orig - neighborAvg;
+
+          if (Math.abs(diff) >= noiseThreshold) {
+            // Anti-halo clamping: prevent overshooting beyond local neighbors
+            const minNeighbor = Math.min(topVal, botVal, leftVal, rightVal);
+            const maxNeighbor = Math.max(topVal, botVal, leftVal, rightVal);
+
+            let sharpened = orig + diff * (alpha * 4);
+            sharpened = Math.min(maxNeighbor + 22, Math.max(minNeighbor - 22, sharpened));
+            src[i + c] = Math.min(255, Math.max(0, Math.round(sharpened)));
+          } else {
+            src[i + c] = orig;
+          }
+        }
+      }
+    }
+
+    // Pass 2: Structural Contour Tightening for 8K / Studio mode
+    if (is8K || level === 'studio8k') {
+      const step2 = primaryStep + 1;
+      if (step2 < Math.min(w, h) / 4) {
+        const tempBuf = new Uint8ClampedArray(src);
+        const secondAlpha = alpha * 0.42;
+
+        for (let y = step2; y < h - step2; y += 1) {
+          const rPrev = (y - step2) * w;
+          const rCurr = y * w;
+          const rNext = (y + step2) * w;
+
+          for (let x = step2; x < w - step2; x += 1) {
+            const i = (rCurr + x) << 2;
+            const top = (rPrev + x) << 2;
+            const bottom = (rNext + x) << 2;
+            const left = (rCurr + (x - step2)) << 2;
+            const right = (rCurr + (x + step2)) << 2;
+
+            for (let c = 0; c < 3; c++) {
+              const orig = tempBuf[i + c];
+              const neighborAvg = (tempBuf[top + c] + tempBuf[bottom + c] + tempBuf[left + c] + tempBuf[right + c]) * 0.25;
+              const diff = orig - neighborAvg;
+
+              if (Math.abs(diff) >= 6) {
+                src[i + c] = Math.min(255, Math.max(0, Math.round(orig + diff * (secondAlpha * 2.6))));
+              }
+            }
+          }
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  } catch (err) {
+    console.debug('Storyboard crisp engine skipped:', err);
+  }
+}
+
+/**
+ * Multi-Octave Progressive Upscaler.
+ * When scaling up by more than 1.35x (e.g. 2x, 4x, 8x to reach 8K),
+ * a single-step drawImage causes severe bilinear blurring and smudges storyboard line art.
+ * This function scales in progressive 2x intermediate octaves with intermediate
+ * edge tightening so storyboard lines remain crisp and razor sharp at 8K!
+ */
+export function drawWithProgressiveOctaveUpscaling(
+  targetCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  source: CanvasImageSource,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
+  dw: number,
+  dh: number,
+  enableProgressive: boolean = true
+): void {
+  // If scale factor is small, draw directly
+  if (!enableProgressive || (dw <= sw * 1.35 && dh <= sh * 1.35)) {
+    targetCtx.drawImage(source, sx, sy, sw, sh, 0, 0, dw, dh);
+    return;
+  }
+
+  try {
+    // Step 1: Crop initial source region
+    let curCanvas: HTMLCanvasElement | OffscreenCanvas;
+    let curCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+
+    if (typeof OffscreenCanvas !== 'undefined') {
+      curCanvas = new OffscreenCanvas(sw, sh);
+      curCtx = curCanvas.getContext('2d');
+    } else {
+      curCanvas = document.createElement('canvas');
+      curCanvas.width = sw;
+      curCanvas.height = sh;
+      curCtx = (curCanvas as HTMLCanvasElement).getContext('2d');
+    }
+
+    if (!curCtx) {
+      targetCtx.drawImage(source, sx, sy, sw, sh, 0, 0, dw, dh);
+      return;
+    }
+
+    curCtx.imageSmoothingEnabled = true;
+    curCtx.imageSmoothingQuality = 'high';
+    curCtx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
+
+    let curW = sw;
+    let curH = sh;
+
+    // Step 2: Progressive 2x octave doubling
+    while (curW * 2 < dw && curH * 2 < dh) {
+      const nextW = curW * 2;
+      const nextH = curH * 2;
+
+      let nextCanvas: HTMLCanvasElement | OffscreenCanvas;
+      let nextCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+
+      if (typeof OffscreenCanvas !== 'undefined') {
+        nextCanvas = new OffscreenCanvas(nextW, nextH);
+        nextCtx = nextCanvas.getContext('2d');
+      } else {
+        nextCanvas = document.createElement('canvas');
+        nextCanvas.width = nextW;
+        nextCanvas.height = nextH;
+        nextCtx = (nextCanvas as HTMLCanvasElement).getContext('2d');
+      }
+
+      if (!nextCtx) break;
+
+      nextCtx.imageSmoothingEnabled = true;
+      nextCtx.imageSmoothingQuality = 'high';
+      nextCtx.drawImage(curCanvas, 0, 0, curW, curH, 0, 0, nextW, nextH);
+
+      // Light intermediate edge tightening to preserve line art slope
+      applyIntermediateEdgeTightening(nextCtx, nextW, nextH);
+
+      // Dispose previous canvas to release RAM immediately
+      curCanvas.width = 1;
+      curCanvas.height = 1;
+
+      curCanvas = nextCanvas;
+      curW = nextW;
+      curH = nextH;
+    }
+
+    // Step 3: Final scaling step directly onto targetCtx
+    targetCtx.imageSmoothingEnabled = true;
+    targetCtx.imageSmoothingQuality = 'high';
+    targetCtx.drawImage(curCanvas, 0, 0, curW, curH, 0, 0, dw, dh);
+
+    // Dispose last temporary canvas
+    curCanvas.width = 1;
+    curCanvas.height = 1;
+  } catch (err) {
+    console.debug('Progressive upscaling fallback to direct draw:', err);
+    targetCtx.drawImage(source, sx, sy, sw, sh, 0, 0, dw, dh);
+  }
+}
+
+/**
+ * Fast intermediate edge gradient steepener for progressive octave stages.
+ */
+function applyIntermediateEdgeTightening(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  w: number,
+  h: number
+): void {
+  try {
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    const len = d.length;
+    // Mild S-curve contrast boost across mid-tones to prevent edge slope decay during scaling
+    for (let i = 0; i < len; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const val = d[i + c];
+        if (val > 30 && val < 225) {
+          const norm = (val - 128) / 128;
+          d[i + c] = Math.min(255, Math.max(0, Math.round(128 + norm * 1.08 * 128)));
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  } catch {
+    // ignore
   }
 }
 
@@ -540,7 +790,18 @@ export async function generatePanelOutputs(
           }
         }
 
-        ctx.drawImage(drawableSource, sx, sy, sw, sh, 0, 0, dw, dh);
+        // Render image using progressive octave upscaling to maintain crisp line art and sharp edges
+        drawWithProgressiveOctaveUpscaling(
+          ctx,
+          drawableSource,
+          sx,
+          sy,
+          sw,
+          sh,
+          dw,
+          dh,
+          settings.progressiveUpscale !== false
+        );
 
         // Reset filter
         if (contrastVal !== 100 && hardwareFilterApplied) {
@@ -560,14 +821,19 @@ export async function generatePanelOutputs(
         const is4K = Boolean(!is8K && (settings.enhanceTo4K || settings.resolutionMode === '4k'));
         const sharpnessMode = settings.sharpnessLevel || (settings.sharpnessBoost === false ? 'off' : 'ultra');
 
-        // Apply multi-scale unsharp mask sharpness enhancement
+        // Apply specialized Storyboard Crisp Engine or standard sharpness enhancement
         if (settings.sharpnessBoost !== false && sharpnessMode !== 'off') {
-          applySharpnessEnhancement(ctx, dw, dh, sharpnessMode, is8K || is4K);
+          if (settings.storyboardEnhance !== false) {
+            applyStoryboardCrispEngine(ctx, dw, dh, sharpnessMode, is8K);
+          } else {
+            applySharpnessEnhancement(ctx, dw, dh, sharpnessMode, is8K || is4K);
+          }
         }
 
         // Apply micro-contrast clarity enhancement to eliminate haze and ensure crystal-clear output
         if (settings.clarityBoost !== false && sharpnessMode !== 'off') {
-          applyClarityEnhancement(ctx, dw, dh, sharpnessMode === 'ultra' ? 0.22 : 0.16);
+          const clarityStrength = sharpnessMode === 'studio8k' ? 0.26 : sharpnessMode === 'ultra' ? 0.22 : 0.16;
+          applyClarityEnhancement(ctx, dw, dh, clarityStrength);
         }
 
         blob = await offscreen.convertToBlob({
@@ -603,7 +869,18 @@ export async function generatePanelOutputs(
           }
         }
 
-        ctx.drawImage(drawableSource, sx, sy, sw, sh, 0, 0, dw, dh);
+        // Render image using progressive octave upscaling to maintain crisp line art and sharp edges
+        drawWithProgressiveOctaveUpscaling(
+          ctx,
+          drawableSource,
+          sx,
+          sy,
+          sw,
+          sh,
+          dw,
+          dh,
+          settings.progressiveUpscale !== false
+        );
 
         // Reset filter
         if (contrastVal !== 100 && hardwareFilterApplied) {
@@ -623,14 +900,19 @@ export async function generatePanelOutputs(
         const is4K = Boolean(!is8K && (settings.enhanceTo4K || settings.resolutionMode === '4k'));
         const sharpnessMode = settings.sharpnessLevel || (settings.sharpnessBoost === false ? 'off' : 'ultra');
 
-        // Apply multi-scale unsharp mask sharpness enhancement
+        // Apply specialized Storyboard Crisp Engine or standard sharpness enhancement
         if (settings.sharpnessBoost !== false && sharpnessMode !== 'off') {
-          applySharpnessEnhancement(ctx, dw, dh, sharpnessMode, is8K || is4K);
+          if (settings.storyboardEnhance !== false) {
+            applyStoryboardCrispEngine(ctx, dw, dh, sharpnessMode, is8K);
+          } else {
+            applySharpnessEnhancement(ctx, dw, dh, sharpnessMode, is8K || is4K);
+          }
         }
 
         // Apply micro-contrast clarity enhancement to eliminate haze and ensure crystal-clear output
         if (settings.clarityBoost !== false && sharpnessMode !== 'off') {
-          applyClarityEnhancement(ctx, dw, dh, sharpnessMode === 'ultra' ? 0.22 : 0.16);
+          const clarityStrength = sharpnessMode === 'studio8k' ? 0.26 : sharpnessMode === 'ultra' ? 0.22 : 0.16;
+          applyClarityEnhancement(ctx, dw, dh, clarityStrength);
         }
 
         blob = await new Promise<Blob>((resolve, reject) => {

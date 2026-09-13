@@ -1068,14 +1068,49 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               </button>
             </div>
 
+            {/* Upscale Target Selection: Each Panel vs Entire Canvas */}
+            <div className="pt-2 border-t border-gray-200 dark:border-[#374151] flex items-center justify-between text-[11px]">
+              <span className="text-gray-600 dark:text-gray-400 font-medium">Upscale Target:</span>
+              <div className="flex rounded bg-gray-200 dark:bg-[#111827] p-0.5 border border-gray-300 dark:border-[#374151]">
+                <button
+                  type="button"
+                  onClick={() => onUpdateSettings({ upscaleTarget: 'panel' })}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                    (settings.upscaleTarget || 'panel') === 'panel'
+                      ? 'bg-purple-600 text-white font-bold'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  title="Upscale each individual split panel up to 8K (recommended for storyboards)"
+                >
+                  Each Panel (8K)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onUpdateSettings({ upscaleTarget: 'canvas' })}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                    settings.upscaleTarget === 'canvas'
+                      ? 'bg-purple-600 text-white font-bold'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  title="Upscale full source canvas before slicing"
+                >
+                  Entire Sheet
+                </button>
+              </div>
+            </div>
+
             {/* Informational callout for active resolution */}
             <div className="p-2.5 rounded-md text-[11px] leading-relaxed border transition-colors bg-purple-500/5 dark:bg-purple-500/10 border-purple-500/20 text-gray-700 dark:text-gray-300">
               {settings.enhanceTo8K || settings.resolutionMode === '8k' ? (
                 <div className="flex items-start gap-2">
                   <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-purple-700 dark:text-purple-300 block">8K Ultra-HD Active</span>
-                    Outputs sliced panels up to 7680px with razor-sharp edge sharpening for extreme detail and printing.
+                    <span className="font-bold text-purple-700 dark:text-purple-300 block">
+                      8K Ultra-HD Active {settings.upscaleTarget !== 'canvas' ? '(Per Split Image)' : '(Full Sheet)'}
+                    </span>
+                    {settings.upscaleTarget !== 'canvas'
+                      ? 'Each individual storyboard panel is enhanced up to 7680px with progressive octave upscaling and razor-sharp contour definition.'
+                      : 'Outputs the total sliced canvas up to 7680px with razor-sharp edge sharpening for extreme detail and printing.'}
                   </div>
                 </div>
               ) : settings.enhanceTo4K || settings.resolutionMode === '4k' ? (
@@ -1114,6 +1149,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold border border-purple-500/20 uppercase">
                   {settings.sharpnessBoost === false || settings.sharpnessLevel === 'off'
                     ? 'Off'
+                    : settings.sharpnessLevel === 'studio8k'
+                    ? 'Studio 8K Master'
                     : settings.sharpnessLevel === 'subtle'
                     ? 'Subtle'
                     : settings.sharpnessLevel === 'crisp'
@@ -1122,18 +1159,19 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 </span>
               </div>
 
-              {/* 4 One-Tap Presets */}
-              <div className="grid grid-cols-4 gap-1.5">
+              {/* 5 One-Tap Presets including Studio 8K */}
+              <div className="grid grid-cols-5 gap-1">
                 {[
-                  { id: 'ultra', label: 'Ultra', desc: 'Max Sharp' },
+                  { id: 'studio8k', label: 'Studio 8K', desc: 'Master' },
+                  { id: 'ultra', label: 'Ultra', desc: 'Heavy' },
                   { id: 'crisp', label: 'Crisp', desc: 'Balanced' },
                   { id: 'subtle', label: 'Subtle', desc: 'Light' },
-                  { id: 'off', label: 'Off', desc: 'Raw 1:1' },
+                  { id: 'off', label: 'Off', desc: 'Raw' },
                 ].map((item) => {
                   const isActive =
                     item.id === 'off'
                       ? settings.sharpnessBoost === false || settings.sharpnessLevel === 'off'
-                      : settings.sharpnessBoost !== false && (settings.sharpnessLevel || 'ultra') === item.id;
+                      : settings.sharpnessBoost !== false && (settings.sharpnessLevel || 'studio8k') === item.id;
 
                   return (
                     <button
@@ -1145,25 +1183,51 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         } else {
                           onUpdateSettings({
                             sharpnessBoost: true,
-                            sharpnessLevel: item.id as 'subtle' | 'crisp' | 'ultra',
+                            sharpnessLevel: item.id as 'subtle' | 'crisp' | 'ultra' | 'studio8k',
                           });
                         }
                       }}
-                      className={`py-1.5 px-1.5 rounded text-xs font-medium transition-all text-center flex flex-col items-center justify-center ${
+                      className={`py-1.5 px-1 rounded text-[11px] font-medium transition-all text-center flex flex-col items-center justify-center ${
                         isActive
                           ? 'bg-purple-600 text-white font-bold shadow-sm ring-1 ring-purple-400'
                           : 'bg-white dark:bg-[#111827] border border-gray-200 dark:border-[#374151] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1F2937]'
                       }`}
                     >
-                      <span className="leading-tight">{item.label}</span>
+                      <span className="leading-tight text-[11px]">{item.label}</span>
                       <span className="text-[9px] opacity-75 font-mono leading-tight">{item.desc}</span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Clarity & De-Haze Micro-Contrast Toggle */}
+              {/* Storyboard Crisp Engine Toggle */}
               <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none pt-1">
+                <input
+                  type="checkbox"
+                  checked={settings.storyboardEnhance !== false}
+                  onChange={(e) => onUpdateSettings({ storyboardEnhance: e.target.checked })}
+                  className="rounded border-gray-300 dark:border-[#374151] text-purple-600 focus:ring-0 cursor-pointer"
+                />
+                <span className="flex-1">
+                  <strong>Storyboard & Manga Crisp Engine</strong> <span className="text-gray-400 text-[11px]">(reinforces pencil/ink lines & anti-halo protection)</span>
+                </span>
+              </label>
+
+              {/* Progressive Octave Upscaling Toggle */}
+              <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={settings.progressiveUpscale !== false}
+                  onChange={(e) => onUpdateSettings({ progressiveUpscale: e.target.checked })}
+                  className="rounded border-gray-300 dark:border-[#374151] text-purple-600 focus:ring-0 cursor-pointer"
+                />
+                <span className="flex-1">
+                  <strong>Progressive Multi-Octave Upscaling</strong> <span className="text-gray-400 text-[11px]">(eliminates blur when scaling to 8K)</span>
+                </span>
+              </label>
+
+              {/* Clarity & De-Haze Micro-Contrast Toggle */}
+              <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={settings.clarityBoost !== false}
@@ -1171,14 +1235,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   className="rounded border-gray-300 dark:border-[#374151] text-purple-600 focus:ring-0 cursor-pointer"
                 />
                 <span className="flex-1">
-                  Micro-Contrast Clarity <span className="text-gray-400 text-[11px]">(removes haze & sharpens textures)</span>
+                  <strong>Micro-Contrast Clarity</strong> <span className="text-gray-400 text-[11px]">(removes haze & sharpens textures)</span>
                 </span>
               </label>
 
               {/* Active Sharpness & Clarity status notice */}
               {(settings.sharpnessBoost !== false && settings.sharpnessLevel !== 'off') && (
                 <div className="p-2 rounded bg-purple-500/5 dark:bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-900 dark:text-purple-200 leading-snug">
-                  ✨ <strong>Razor-Sharp Output Active:</strong> Slices will be rendered with adaptive edge sharpening and micro-contrast clarity to ensure ultra-crisp output across all panels.
+                  ✨ <strong>Razor-Sharp Storyboard Output Active:</strong> Slices will be rendered with multi-octave upscaling, contour edge locking, and anti-halo protection to ensure sharp, crisp, high-quality images.
                 </div>
               )}
             </div>

@@ -64,8 +64,11 @@ export interface EditorSettings {
   resolutionMode: ResolutionMode;
   enhanceTo8K?: boolean; // Automatically scale and enhance up to 8K Ultra-HD (7680px)
   enhanceTo4K?: boolean; // Automatically enhance quality up to 4K on upload & export
+  upscaleTarget?: 'panel' | 'canvas'; // 'panel': upscale each individual split panel up to target resolution (ideal for storyboards); 'canvas': scale whole canvas
+  storyboardEnhance?: boolean; // Specialized crisp contour engine for storyboards, manga, sketch & line art
+  progressiveUpscale?: boolean; // Multi-octave cascaded stepping to eliminate scaling blur
   sharpnessBoost?: boolean; // Unsharp edge enhancement for ultra-crisp details
-  sharpnessLevel?: 'off' | 'subtle' | 'crisp' | 'ultra'; // Configurable sharpness level
+  sharpnessLevel?: 'off' | 'subtle' | 'crisp' | 'ultra' | 'studio8k'; // Configurable sharpness level
   clarityBoost?: boolean; // Micro-contrast edge clarity enhancement (removes haze, sharpens textures)
   customScalePercent: number; // e.g. 100, 75, 50, 200
   customWidth?: number;
