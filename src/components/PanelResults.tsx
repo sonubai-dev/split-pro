@@ -29,6 +29,7 @@ interface PanelResultsProps {
   onReorderPanels: (reordered: PanelSlice[]) => void;
   onRenamePanel: (id: string, newName: string) => void;
   onGenerate: () => void;
+  onCloseMobile?: () => void;
 }
 
 export const PanelResults: React.FC<PanelResultsProps> = ({
@@ -45,6 +46,7 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
   onReorderPanels,
   onRenamePanel,
   onGenerate,
+  onCloseMobile,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
@@ -130,11 +132,23 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
             )}
           </div>
 
-          {panels.length > 0 && (
-            <span className="text-[11px] font-mono text-gray-500 dark:text-gray-400">
-              EST: {formatBytes(totalBytes)}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {panels.length > 0 && (
+              <span className="text-[11px] font-mono text-gray-500 dark:text-gray-400">
+                EST: {formatBytes(totalBytes)}
+              </span>
+            )}
+            {onCloseMobile && (
+              <button
+                type="button"
+                onClick={onCloseMobile}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-700 dark:text-gray-300 font-medium text-xs transition-colors border border-gray-300 dark:border-[#374151]"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Canvas</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Global Export Actions */}

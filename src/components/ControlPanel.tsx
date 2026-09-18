@@ -18,6 +18,7 @@ import {
   Sun,
   RotateCcw,
   Zap,
+  X,
 } from 'lucide-react';
 import {
   EditorSettings,
@@ -42,6 +43,7 @@ interface ControlPanelProps {
   onReplaceImage: () => void;
   onRemoveImage: () => void;
   onToast?: (title: string, desc?: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
+  onCloseMobile?: () => void;
 }
 
 const AUTO_PARTS_PRESETS = [1, 10, 20];
@@ -71,6 +73,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   onReplaceImage,
   onRemoveImage,
   onToast,
+  onCloseMobile,
 }) => {
   const [showPresetsDrawer, setShowPresetsDrawer] = useState(false);
   const [detectSensitivity, setDetectSensitivity] = useState<number>(10);
@@ -132,8 +135,34 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col justify-between bg-white dark:bg-[#0D1117] border-r border-gray-200 dark:border-[#1F2937] overflow-y-auto text-gray-800 dark:text-[#E5E7EB] select-none transition-colors">
-      <div className="p-4 space-y-5">
+    <div className="w-full h-full flex flex-col bg-white dark:bg-[#0D1117] border-r border-gray-200 dark:border-[#1F2937] text-gray-800 dark:text-[#E5E7EB] select-none transition-colors overflow-hidden">
+      {/* Mobile Sticky Header */}
+      {onCloseMobile && (
+        <div className="sticky top-0 z-30 px-3.5 py-2.5 bg-white/95 dark:bg-[#0D1117]/95 backdrop-blur-md border-b border-gray-200 dark:border-[#1F2937] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <Sliders className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+            <div className="min-w-0">
+              <span className="font-bold text-xs uppercase tracking-wider text-gray-900 dark:text-white block truncate">
+                Split Settings & Quality
+              </span>
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono block truncate">
+                {sliceCount} Slices • {settings.enhanceTo8K || settings.resolutionMode === '8k' ? '8K Ultra' : settings.enhanceTo4K || settings.resolutionMode === '4k' ? '4K UHD' : 'Lossless'}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onCloseMobile}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-sm transition-all active:scale-95 shrink-0"
+          >
+            <Check className="w-3.5 h-3.5" />
+            <span>Done</span>
+          </button>
+        </div>
+      )}
+
+      {/* Main Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {/* Section 1: Source Image Information Card */}
         <div className="p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151]">
           <div className="flex items-start justify-between gap-3">
@@ -1466,26 +1495,42 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
       </div>
 
-      {/* Primary Sticky Bottom CTA */}
-      <div className="p-4 bg-gray-50 dark:bg-[#111827] border-t border-gray-200 dark:border-[#1F2937] transition-colors">
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={isGenerating}
-          className="w-full py-2.5 px-4 rounded font-bold text-xs uppercase tracking-wider bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          {isGenerating ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin text-white dark:text-black" />
-              <span>Generating {sliceCount} Panels...</span>
-            </>
-          ) : (
-            <>
-              <Layers className="w-4 h-4 text-white dark:text-black" />
-              <span>Generate {sliceCount} Panels</span>
-            </>
+      {/* Primary Sticky Bottom CTA - Guaranteed Always Visible & Sticky */}
+      <div className="sticky bottom-0 z-30 shrink-0 p-3 sm:p-4 bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border-t border-gray-200 dark:border-[#1F2937] shadow-lg transition-colors">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={isGenerating}
+            className="flex-1 py-2.5 sm:py-3 px-4 rounded-lg font-bold text-xs uppercase tracking-wider bg-blue-600 hover:bg-blue-500 text-white shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px]"
+          >
+            {isGenerating ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                <span>Generating {sliceCount} Panels...</span>
+              </>
+            ) : (
+              <>
+                <Layers className="w-4 h-4 text-white" />
+                <span>
+                  Generate {sliceCount} Panels
+                  {settings.enhanceTo8K || settings.resolutionMode === '8k' ? ' (8K)' : settings.enhanceTo4K || settings.resolutionMode === '4k' ? ' (4K)' : ''}
+                </span>
+              </>
+            )}
+          </button>
+
+          {onCloseMobile && (
+            <button
+              type="button"
+              onClick={onCloseMobile}
+              className="px-3.5 py-2.5 sm:py-3 rounded-lg bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-700 dark:text-gray-300 font-semibold text-xs transition-colors min-h-[44px] flex items-center justify-center shrink-0 border border-gray-300 dark:border-[#374151]"
+              title="Return to canvas"
+            >
+              Canvas
+            </button>
           )}
-        </button>
+        </div>
       </div>
     </div>
   );

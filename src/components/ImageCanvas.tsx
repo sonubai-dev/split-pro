@@ -11,6 +11,8 @@ import {
   Move,
   Grid as GridIcon,
   Layers,
+  Sliders,
+  Zap,
 } from 'lucide-react';
 import { EditorSettings, LoadedImage, PanelSlice } from '../types';
 
@@ -21,6 +23,8 @@ interface ImageCanvasProps {
   selectedPanelId: string | null;
   onSelectPanel: (id: string) => void;
   onUpdateSettings: (updater: Partial<EditorSettings> | ((prev: EditorSettings) => EditorSettings)) => void;
+  onOpenSettings?: () => void;
+  onGenerate?: () => void;
 }
 
 export const ImageCanvas: React.FC<ImageCanvasProps> = ({
@@ -30,6 +34,8 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
   selectedPanelId,
   onSelectPanel,
   onUpdateSettings,
+  onOpenSettings,
+  onGenerate,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState<number>(1);
@@ -346,47 +352,67 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
       }}
     >
       {/* Floating Canvas Top Toolbar */}
-      <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Left Status Pill */}
-        <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/90 dark:bg-[#111827]/90 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#374151] text-xs font-mono backdrop-blur-md shadow-lg">
-          <span className="text-gray-400 dark:text-gray-500">CANVAS:</span>
-          <span className="font-semibold text-gray-900 dark:text-white">
-            {image.width} × {image.height}px
-          </span>
-          <span className="text-gray-300 dark:text-gray-600">|</span>
-          <span className="text-blue-600 dark:text-blue-400 font-semibold">{slices.length} PANELS</span>
-          {Boolean(settings.enhanceTo8K || settings.resolutionMode === '8k') && (
-            <>
-              <span className="text-gray-300 dark:text-gray-600">|</span>
-              <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold border border-purple-500/20 text-[10px]">
-                8K ULTRA
-              </span>
-            </>
+      <div className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        {/* Left Status & Mobile Action Buttons */}
+        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
+          {/* Mobile Quick Settings & Split buttons */}
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="lg:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md active:scale-95 transition-all"
+              title="Open Split & Grid Settings Sidebar"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Settings</span>
+            </button>
           )}
-          {Boolean((settings.enhanceTo4K || settings.resolutionMode === '4k') && !settings.enhanceTo8K && settings.resolutionMode !== '8k') && (
-            <>
-              <span className="text-gray-300 dark:text-gray-600">|</span>
-              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[10px]">
-                4K UHD
-              </span>
-            </>
+
+          {onGenerate && (
+            <button
+              type="button"
+              onClick={onGenerate}
+              className="lg:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md active:scale-95 transition-all"
+              title="Split Panels Now"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-300" />
+              <span>Split {slices.length}</span>
+            </button>
           )}
-          {settings.contrast !== undefined && settings.contrast !== 100 && (
-            <>
-              <span className="text-gray-300 dark:text-gray-600">|</span>
-              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/20 text-[10px]">
-                CONTRAST {settings.contrast}%
-              </span>
-            </>
-          )}
-          {Boolean(settings.sharpnessBoost !== false && settings.sharpnessLevel !== 'off') && (
-            <>
-              <span className="text-gray-300 dark:text-gray-600">|</span>
-              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20 text-[10px] flex items-center gap-1">
-                SHARP & CLEAR
-              </span>
-            </>
-          )}
+
+          {/* Desktop/Tablet Status Pill */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/90 dark:bg-[#111827]/90 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#374151] text-xs font-mono backdrop-blur-md shadow-lg">
+            <span className="text-gray-400 dark:text-gray-500">CANVAS:</span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {image.width} × {image.height}px
+            </span>
+            <span className="text-gray-300 dark:text-gray-600">|</span>
+            <span className="text-blue-600 dark:text-blue-400 font-semibold">{slices.length} PANELS</span>
+            {Boolean(settings.enhanceTo8K || settings.resolutionMode === '8k') && (
+              <>
+                <span className="text-gray-300 dark:text-gray-600">|</span>
+                <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold border border-purple-500/20 text-[10px]">
+                  8K ULTRA
+                </span>
+              </>
+            )}
+            {Boolean((settings.enhanceTo4K || settings.resolutionMode === '4k') && !settings.enhanceTo8K && settings.resolutionMode !== '8k') && (
+              <>
+                <span className="text-gray-300 dark:text-gray-600">|</span>
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 text-[10px]">
+                  4K UHD
+                </span>
+              </>
+            )}
+            {Boolean(settings.sharpnessBoost !== false && settings.sharpnessLevel !== 'off') && (
+              <>
+                <span className="text-gray-300 dark:text-gray-600">|</span>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20 text-[10px] flex items-center gap-1">
+                  SHARP
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Right Zoom & View Controls */}

@@ -13,6 +13,8 @@ import {
   Plus,
   X,
   Zap,
+  RefreshCw,
+  Check,
 } from 'lucide-react';
 import {
   EditorSettings,
@@ -516,13 +518,13 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
   return (
     <div className="h-[calc(100vh-56px)] w-full flex flex-col overflow-hidden bg-gray-100 dark:bg-[#0A0A0B] text-gray-800 dark:text-[#E5E7EB] transition-colors">
       {/* Sub-Header Toolbar: Undo/Redo & Quick Actions */}
-      <div className="h-10 px-4 sm:px-6 border-b border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827] flex items-center justify-between gap-4 select-none shrink-0 text-xs transition-colors">
-        <div className="flex items-center gap-2 sm:gap-3">
+      <div className="h-10 px-3 sm:px-6 border-b border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827] flex items-center justify-between gap-2 sm:gap-4 select-none shrink-0 text-xs transition-colors">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           <button
             type="button"
             onClick={onUndo}
             disabled={!canUndo}
-            className="flex items-center gap-1 px-2.5 py-1 rounded text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] border border-gray-300 dark:border-[#374151] disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] border border-gray-300 dark:border-[#374151] disabled:opacity-30 disabled:pointer-events-none transition-colors"
             title="Undo (Ctrl+Z)"
           >
             <Undo className="w-3.5 h-3.5" />
@@ -533,7 +535,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
             type="button"
             onClick={onRedo}
             disabled={!canRedo}
-            className="flex items-center gap-1 px-2.5 py-1 rounded text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] border border-gray-300 dark:border-[#374151] disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] border border-gray-300 dark:border-[#374151] disabled:opacity-30 disabled:pointer-events-none transition-colors"
             title="Redo (Ctrl+Shift+Z)"
           >
             <Redo className="w-3.5 h-3.5" />
@@ -545,22 +547,42 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
           <button
             type="button"
             onClick={onReset}
-            className="flex items-center gap-1 px-2.5 py-1 rounded text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 bg-gray-50 dark:bg-[#1F2937]/60 hover:bg-gray-200 dark:hover:bg-[#1F2937] border border-gray-300 dark:border-[#374151] transition-colors"
+            className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 bg-gray-50 dark:bg-[#1F2937]/60 hover:bg-gray-200 dark:hover:bg-[#1F2937] border border-gray-300 dark:border-[#374151] transition-colors"
             title="Reset Settings"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Reset</span>
           </button>
+
+          {/* Quick mobile sidebar toggle button in sub-header */}
+          <button
+            type="button"
+            onClick={() => setMobileTab(mobileTab === 'controls' ? 'canvas' : 'controls')}
+            className={`lg:hidden flex items-center gap-1 px-2.5 py-1 rounded font-medium border transition-colors ${
+              mobileTab === 'controls'
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/60'
+            }`}
+            title="Toggle Settings & Split Options"
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>{mobileTab === 'controls' ? 'Canvas' : 'Settings'}</span>
+          </button>
         </div>
 
         {/* Center Mode indicator */}
-        <div className="text-[11px] font-mono text-gray-500 dark:text-gray-400 hidden md:flex items-center gap-2">
-          <span>MODE:</span>
-          <span className="uppercase text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-[#1F2937] px-2 py-0.5 rounded border border-blue-200 dark:border-[#374151]">
+        <div className="text-[11px] font-mono text-gray-500 dark:text-gray-400 flex items-center gap-1.5 sm:gap-2">
+          <span className="hidden md:inline">MODE:</span>
+          <span className="uppercase text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-[#1F2937] px-1.5 sm:px-2 py-0.5 rounded border border-blue-200 dark:border-[#374151]">
             {settings.splitMode}
           </span>
           <span className="text-gray-400 dark:text-gray-500">•</span>
-          <span>{currentSlices.length} PANELS</span>
+          <span className="font-semibold">{currentSlices.length}P</span>
+          {(settings.enhanceTo8K || settings.resolutionMode === '8k') && (
+            <span className="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold text-[10px] hidden xs:inline">
+              8K
+            </span>
+          )}
         </div>
 
         {/* Right Action */}
@@ -570,18 +592,19 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
               type="button"
               onClick={handleBatchExportZip}
               disabled={isGenerating}
-              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50"
               title={`Slice and export all ${images.length} images into a single ZIP`}
             >
               <FileArchive className="w-3.5 h-3.5" />
-              <span>Export All {images.length} (ZIP)</span>
+              <span className="hidden sm:inline">Export All {images.length} (ZIP)</span>
+              <span className="sm:hidden">All ({images.length})</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={handleDownloadZip}
               disabled={isGenerating}
-              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50"
             >
               <FileArchive className="w-3.5 h-3.5" />
               <span>Export ZIP</span>
@@ -590,113 +613,115 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
         </div>
       </div>
 
-      {/* Batch Image Management Strip */}
-      <div className="h-10 px-4 sm:px-6 bg-gray-50/90 dark:bg-[#0E131F] border-b border-gray-200 dark:border-[#1F2937] flex items-center justify-between gap-3 overflow-x-auto select-none shrink-0 transition-colors">
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold font-mono bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-            <Images className="w-3.5 h-3.5" />
-            BATCH ({images.length || 1})
-          </span>
-        </div>
-
-        {/* Horizontal Image Thumbnails Strip */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 flex-1 max-w-3xl">
-          {images.map((img, idx) => {
-            const isActive = idx === activeImageIndex;
-            return (
-              <div
-                key={`${img.name}-${idx}`}
-                onClick={() => onSelectImageIndex && onSelectImageIndex(idx)}
-                className={`group flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium cursor-pointer transition-all shrink-0 border ${
-                  isActive
-                    ? 'bg-white dark:bg-[#1F2937] text-blue-600 dark:text-blue-400 border-blue-500 shadow-xs font-semibold'
-                    : 'bg-white/60 dark:bg-[#161B22] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-[#30363D] hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-                title={`Switch active preview to ${img.name} (${img.width}×${img.height}px)`}
-              >
-                {img.url ? (
-                  <img src={img.url} alt="" className="w-4 h-4 object-cover rounded shrink-0" />
-                ) : (
-                  <span className="w-4 h-4 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[9px] font-bold">
-                    {idx + 1}
-                  </span>
-                )}
-                <span className="truncate max-w-[100px] sm:max-w-[130px]">{img.name}</span>
-                <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">
-                  {img.width}×{img.height}
-                </span>
-                {images.length > 1 && onRemoveImageIndex && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveImageIndex(idx);
-                    }}
-                    className="p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors ml-0.5"
-                    title={`Remove ${img.name} from batch`}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Add more images button */}
-          {onAddImages && (
-            <>
-              <input
-                ref={batchInputRef}
-                type="file"
-                accept="image/png, image/jpeg, image/webp, image/jpg, image/avif"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    onAddImages(Array.from(e.target.files));
-                    e.target.value = '';
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => batchInputRef.current?.click()}
-                className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-[#1F2937] hover:bg-gray-100 dark:hover:bg-[#2D3748] border border-dashed border-gray-300 dark:border-gray-600 transition-colors shrink-0"
-                title="Add more images to this batch"
-              >
-                <Plus className="w-3 h-3 text-blue-500" />
-                <span>Add Images</span>
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Right side batch helper & quick download all */}
-        <div className="hidden sm:flex items-center gap-2 shrink-0">
-          <span className="hidden lg:inline text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-            Settings applied across batch
-          </span>
-          <button
-            type="button"
-            disabled={isGenerating}
-            onClick={handleBatchExportZip}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-sm transition-all active:scale-95 disabled:opacity-50"
-            title="Download all slices from all images in this batch as a single ZIP archive"
-          >
-            <FileArchive className="w-3.5 h-3.5 text-amber-300" />
-            <span>Download All as Zip</span>
-            <span className="px-1 py-0.2 rounded bg-purple-800 text-[10px] font-mono font-bold">
-              {images.length}
+      {/* Batch Image Management Strip (Shown when multiple images are loaded or expanded) */}
+      {images.length > 1 && (
+        <div className="h-10 px-3 sm:px-6 bg-gray-50/90 dark:bg-[#0E131F] border-b border-gray-200 dark:border-[#1F2937] flex items-center justify-between gap-3 overflow-x-auto select-none shrink-0 transition-colors">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold font-mono bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+              <Images className="w-3.5 h-3.5" />
+              BATCH ({images.length})
             </span>
-          </button>
-        </div>
-      </div>
+          </div>
 
-      {/* Main 3-Column Workspace Area (Desktop) */}
+          {/* Horizontal Image Thumbnails Strip */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 flex-1 max-w-3xl">
+            {images.map((img, idx) => {
+              const isActive = idx === activeImageIndex;
+              return (
+                <div
+                  key={`${img.name}-${idx}`}
+                  onClick={() => onSelectImageIndex && onSelectImageIndex(idx)}
+                  className={`group flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium cursor-pointer transition-all shrink-0 border ${
+                    isActive
+                      ? 'bg-white dark:bg-[#1F2937] text-blue-600 dark:text-blue-400 border-blue-500 shadow-xs font-semibold'
+                      : 'bg-white/60 dark:bg-[#161B22] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-[#30363D] hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}
+                  title={`Switch active preview to ${img.name} (${img.width}×${img.height}px)`}
+                >
+                  {img.url ? (
+                    <img src={img.url} alt="" className="w-4 h-4 object-cover rounded shrink-0" />
+                  ) : (
+                    <span className="w-4 h-4 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[9px] font-bold">
+                      {idx + 1}
+                    </span>
+                  )}
+                  <span className="truncate max-w-[100px] sm:max-w-[130px]">{img.name}</span>
+                  <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">
+                    {img.width}×{img.height}
+                  </span>
+                  {images.length > 1 && onRemoveImageIndex && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveImageIndex(idx);
+                      }}
+                      className="p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors ml-0.5"
+                      title={`Remove ${img.name} from batch`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Add more images button */}
+            {onAddImages && (
+              <>
+                <input
+                  ref={batchInputRef}
+                  type="file"
+                  accept="image/png, image/jpeg, image/webp, image/jpg, image/avif"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      onAddImages(Array.from(e.target.files));
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => batchInputRef.current?.click()}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-[#1F2937] hover:bg-gray-100 dark:hover:bg-[#2D3748] border border-dashed border-gray-300 dark:border-gray-600 transition-colors shrink-0"
+                  title="Add more images to this batch"
+                >
+                  <Plus className="w-3 h-3 text-blue-500" />
+                  <span>Add Images</span>
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Right side batch helper & quick download all */}
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
+            <span className="hidden lg:inline text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+              Settings applied across batch
+            </span>
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={handleBatchExportZip}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-sm transition-all active:scale-95 disabled:opacity-50"
+              title="Download all slices from all images in this batch as a single ZIP archive"
+            >
+              <FileArchive className="w-3.5 h-3.5 text-amber-300" />
+              <span>Download All as Zip</span>
+              <span className="px-1 py-0.2 rounded bg-purple-800 text-[10px] font-mono font-bold">
+                {images.length}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main 3-Column Workspace Area */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Column: Controls (Desktop) */}
+        {/* Left Column: Controls (Sidebar) */}
         <div
-          className={`w-80 xl:w-96 shrink-0 h-full border-r border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0D1117] transition-colors ${
+          className={`w-full lg:w-80 xl:w-96 shrink-0 h-full border-r border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0D1117] transition-colors ${
             mobileTab === 'controls' ? 'block absolute inset-0 z-30 bg-white dark:bg-[#0D1117]' : 'hidden lg:block'
           }`}
         >
@@ -712,6 +737,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
             onReplaceImage={onReplaceImage}
             onRemoveImage={onRemoveImage}
             onToast={onToast}
+            onCloseMobile={() => setMobileTab('canvas')}
           />
         </div>
 
@@ -728,12 +754,14 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
             selectedPanelId={selectedPanelId}
             onSelectPanel={(id) => setSelectedPanelId(id)}
             onUpdateSettings={onUpdateSettings}
+            onOpenSettings={() => setMobileTab('controls')}
+            onGenerate={handleGeneratePanels}
           />
         </div>
 
-        {/* Right Column: Generated Panels & Inspector (Desktop) */}
+        {/* Right Column: Generated Panels & Inspector */}
         <div
-          className={`w-80 xl:w-96 shrink-0 h-full border-l border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0D1117] transition-colors ${
+          className={`w-full lg:w-80 xl:w-96 shrink-0 h-full border-l border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0D1117] transition-colors ${
             mobileTab === 'results' ? 'block absolute inset-0 z-30 bg-white dark:bg-[#0D1117]' : 'hidden lg:block'
           }`}
         >
@@ -751,6 +779,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
             onReorderPanels={(reordered) => setGeneratedPanels(reordered)}
             onRenamePanel={handleRenamePanel}
             onGenerate={handleGeneratePanels}
+            onCloseMobile={() => setMobileTab('canvas')}
           />
         </div>
       </div>
@@ -764,8 +793,8 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
         panelCount={generatedPanels.length > 0 ? generatedPanels.length : currentSlices.length}
       />
 
-      {/* Bottom Minimalist Status Bar matching Clean Minimalism design */}
-      <footer className="h-7 px-4 bg-white dark:bg-[#111827] border-t border-gray-200 dark:border-[#1F2937] hidden sm:flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 font-mono select-none shrink-0 transition-colors">
+      {/* Bottom Minimalist Status Bar (Desktop) */}
+      <footer className="h-7 px-4 bg-white dark:bg-[#111827] border-t border-gray-200 dark:border-[#1F2937] hidden lg:flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 font-mono select-none shrink-0 transition-colors">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -785,123 +814,93 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
         </div>
       </footer>
 
-      {/* Mobile Floating Quick Action Bar: One-Tap Export */}
-      <div className="lg:hidden bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border-t border-gray-200 dark:border-[#1F2937] px-3 py-2 flex items-center justify-between gap-2 z-40 shrink-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="px-2 py-1 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-mono text-xs font-bold whitespace-nowrap">
-            {currentSlices.length} Slices
-          </span>
-          <span
-            className={`px-1.5 py-1 rounded text-[11px] font-mono font-bold whitespace-nowrap ${
-              settings.enhanceTo8K || settings.resolutionMode === '8k'
-                ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800'
-                : settings.enhanceTo4K || settings.resolutionMode === '4k'
-                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
-                : 'bg-gray-100 dark:bg-[#1F2937] text-gray-600 dark:text-gray-400'
-            }`}
-          >
-            {settings.enhanceTo8K || settings.resolutionMode === '8k'
-              ? '8K Ultra'
-              : settings.enhanceTo4K || settings.resolutionMode === '4k'
-              ? '4K UHD'
-              : '1:1'}
-          </span>
-          {settings.contrast !== undefined && settings.contrast !== 100 && (
-            <span className="hidden sm:inline px-1.5 py-1 rounded text-[10px] font-mono bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
-              {settings.contrast}% Cont.
-            </span>
-          )}
-          {Boolean(settings.sharpnessBoost !== false && settings.sharpnessLevel !== 'off') && (
-            <span
-              onClick={() => onUpdateSettings((prev) => ({
-                sharpnessBoost: prev.sharpnessBoost === false ? true : prev.sharpnessLevel === 'off' ? true : prev.sharpnessBoost,
-                sharpnessLevel: prev.sharpnessLevel === 'ultra' ? 'crisp' : 'ultra'
-              }))}
-              className="px-1.5 py-1 rounded text-[10px] font-mono bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold cursor-pointer select-none"
-              title="Click to toggle sharpness level"
-            >
-              Sharp {settings.sharpnessLevel === 'ultra' ? '★' : '✓'}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          {images && images.length > 1 ? (
-            <button
-              type="button"
-              disabled={isGenerating}
-              onClick={handleBatchExportZip}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-md active:scale-95 transition-all disabled:opacity-50"
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-300" />
-              <span>Batch ZIP ({images.length})</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={isGenerating}
-              onClick={handleDownloadZip}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md active:scale-95 transition-all disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export ZIP</span>
-            </button>
-          )}
-
-          {mobileTab !== 'results' ? (
-            <button
-              type="button"
-              onClick={() => setMobileTab('results')}
-              className="px-2.5 py-2 rounded-lg bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-700 dark:text-gray-300 font-semibold text-xs active:scale-95 transition-all"
-            >
-              View Panels
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setMobileTab('controls')}
-              className="px-2.5 py-2 rounded-lg bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-700 dark:text-gray-300 font-semibold text-xs active:scale-95 transition-all"
-            >
-              Edit Settings
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile Bottom Tab Navigation */}
-      <div className="lg:hidden h-14 border-t border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827] px-4 flex items-center justify-around z-40 shrink-0 transition-colors">
+      {/* Unified Mobile Bottom Command Bar (Always visible on mobile & tablet) */}
+      <div className="lg:hidden bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border-t border-gray-200 dark:border-[#1F2937] px-3 py-2 flex items-center justify-between gap-2 z-40 shrink-0 shadow-lg">
+        {/* Left: Sidebar / Settings Toggle */}
         <button
           type="button"
-          onClick={() => setMobileTab('controls')}
-          className={`flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${
-            mobileTab === 'controls' ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-500 dark:text-gray-400'
+          onClick={() => setMobileTab(mobileTab === 'controls' ? 'canvas' : 'controls')}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all active:scale-95 min-h-[44px] shrink-0 border ${
+            mobileTab === 'controls'
+              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+              : 'bg-gray-100 dark:bg-[#1F2937] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#374151] border-gray-200 dark:border-[#374151]'
           }`}
+          title="Toggle Split & Quality Settings Sidebar"
         >
           <Sliders className="w-4 h-4" />
-          <span>Settings</span>
+          <span className="hidden xs:inline">{mobileTab === 'controls' ? 'Canvas' : 'Sidebar'}</span>
         </button>
 
+        {/* Center: Primary Big Action Button - ALWAYS VISIBLE ON MOBILE */}
         <button
           type="button"
-          onClick={() => setMobileTab('canvas')}
-          className={`flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${
-            mobileTab === 'canvas' ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-500 dark:text-gray-400'
-          }`}
+          onClick={handleGeneratePanels}
+          disabled={isGenerating}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-wider bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white shadow-md shadow-blue-900/25 transition-all disabled:opacity-50 min-h-[44px]"
         >
-          <Maximize className="w-4 h-4" />
-          <span>Canvas</span>
+          {isGenerating ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin text-white shrink-0" />
+              <span className="truncate">
+                {progress.percentage > 0 ? `${progress.percentage}%` : 'Splitting...'}
+              </span>
+            </>
+          ) : (
+            <>
+              <Zap className="w-4 h-4 text-amber-300 shrink-0" />
+              <span className="truncate">
+                Split {currentSlices.length} Panels
+              </span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-800 text-[10px] font-mono font-bold text-white shrink-0 hidden sm:inline">
+                {settings.enhanceTo8K || settings.resolutionMode === '8k' ? '8K' : settings.enhanceTo4K || settings.resolutionMode === '4k' ? '4K' : 'HD'}
+              </span>
+            </>
+          )}
         </button>
 
-        <button
-          type="button"
-          onClick={() => setMobileTab('results')}
-          className={`flex flex-col items-center gap-1 text-[11px] font-medium transition-colors ${
-            mobileTab === 'results' ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-500 dark:text-gray-400'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>Panels ({generatedPanels.length})</span>
-        </button>
+        {/* Right 1: Canvas View (if currently in controls or results) */}
+        {mobileTab !== 'canvas' ? (
+          <button
+            type="button"
+            onClick={() => setMobileTab('canvas')}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-700 dark:text-gray-300 font-semibold text-xs active:scale-95 transition-all min-h-[44px] shrink-0 border border-gray-200 dark:border-[#374151]"
+            title="View Live Canvas"
+          >
+            <Maximize className="w-4 h-4 text-blue-500" />
+            <span className="hidden xs:inline">Canvas</span>
+          </button>
+        ) : (
+          /* Right 2: Panels Results / Quick Export */
+          <button
+            type="button"
+            onClick={() => setMobileTab('results')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all active:scale-95 min-h-[44px] shrink-0 border ${
+              mobileTab === 'results'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                : 'bg-gray-100 dark:bg-[#1F2937] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#374151] border-gray-200 dark:border-[#374151]'
+            }`}
+            title="View Output Panels"
+          >
+            <Layers className="w-4 h-4" />
+            <span className="hidden xs:inline">Panels</span>
+            <span className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-[#374151] text-[10px] font-mono font-bold">
+              {generatedPanels.length}
+            </span>
+          </button>
+        )}
+
+        {/* Quick ZIP Export icon button if panels exist */}
+        {generatedPanels.length > 0 && (
+          <button
+            type="button"
+            onClick={images.length > 1 ? handleBatchExportZip : handleDownloadZip}
+            disabled={isGenerating}
+            className="p-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-md active:scale-95 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
+            title="Download ZIP"
+          >
+            <FileArchive className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </div>
   );
