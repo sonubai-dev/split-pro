@@ -29,7 +29,7 @@ import {
   SplitMode,
 } from '../types';
 import { CREATOR_PRESETS } from '../lib/presets';
-import { calculateAutoSplitGrid, detectPictureBordersAsync, detectPictureBorders, formatBytes } from '../lib/imageEngine';
+import { calculateAutoSplitGrid, detectPictureBordersAsync, detectPictureBorders, formatBytes, formatSliceFilename } from '../lib/imageEngine';
 
 interface ControlPanelProps {
   image: LoadedImage;
@@ -44,6 +44,7 @@ interface ControlPanelProps {
   onRemoveImage: () => void;
   onToast?: (title: string, desc?: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
   onCloseMobile?: () => void;
+  agentHighlight?: string | null;
 }
 
 const AUTO_PARTS_PRESETS = [1, 10, 20];
@@ -74,6 +75,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   onRemoveImage,
   onToast,
   onCloseMobile,
+  agentHighlight,
 }) => {
   const [showPresetsDrawer, setShowPresetsDrawer] = useState(false);
   const [detectSensitivity, setDetectSensitivity] = useState<number>(10);
@@ -285,7 +287,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <label className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold block mb-2">
             Split Mode
           </label>
-          <div className="grid grid-cols-5 gap-1 p-1 rounded-md bg-gray-100 dark:bg-[#111827] border border-gray-200 dark:border-[#1F2937]">
+          <div className={`grid grid-cols-5 gap-1 p-1 rounded-md bg-gray-100 dark:bg-[#111827] border border-gray-200 dark:border-[#1F2937] transition-all duration-300 ${agentHighlight === 'mode' ? 'ring-2 ring-blue-500 shadow-md shadow-blue-500/30' : ''}`}>
             <button
               type="button"
               onClick={() => handleModeChange('auto')}
@@ -524,7 +526,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         )}
 
         {settings.splitMode === 'grid' && (
-          <div className="space-y-3.5 p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151]">
+          <div className={`space-y-3.5 p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151] transition-all duration-300 ${agentHighlight === 'grid' ? 'ring-2 ring-blue-500 shadow-md shadow-blue-500/30' : ''}`}>
             <div>
               <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold block mb-2">
                 Grid Matrix Presets
@@ -684,7 +686,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         )}
 
         {settings.splitMode === 'custom' && (
-          <div className="space-y-3 p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151]">
+          <div className={`space-y-3 p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151] transition-all duration-300 ${agentHighlight === 'custom' ? 'ring-2 ring-blue-500 shadow-md shadow-blue-500/30' : ''}`}>
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-gray-900 dark:text-white">
                 Custom Dividers
@@ -826,7 +828,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         )}
 
         {/* Section 5: Spacing (Outer Margin, Horizontal Gap, Vertical Gap) 0-500px */}
-        <div className="p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151] space-y-3">
+        <div className={`p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151] space-y-3 transition-all duration-300 ${agentHighlight === 'spacing' ? 'ring-2 ring-blue-500 shadow-md shadow-blue-500/30' : ''}`}>
           <div className="flex items-center justify-between">
             <label className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold block">
               Spacing & Margins
@@ -924,7 +926,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
 
         {/* Section 6: Panel Sequence Ordering */}
-        <div className="p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151] space-y-2.5">
+        <div className={`p-3 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151] space-y-2.5 transition-all duration-300 ${agentHighlight === 'sequence' ? 'ring-2 ring-blue-500 shadow-md shadow-blue-500/30' : ''}`}>
           <label className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold block">
             Panel Sequence Order
           </label>
@@ -972,7 +974,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
 
         {/* Section 7: Output Settings, 8K Resolution & Contrast */}
-        <div className="p-3.5 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151] space-y-4">
+        <div className={`p-3.5 rounded-lg bg-gray-50 dark:bg-[#1F2937] border border-gray-200 dark:border-[#374151] space-y-4 transition-all duration-300 ${agentHighlight === 'output' ? 'ring-2 ring-blue-500 shadow-md shadow-blue-500/30' : ''}`}>
           <div className="flex items-center justify-between">
             <label className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold block">
               Output Quality & Resolution
@@ -1465,9 +1467,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           })()}
 
           {/* Naming Options */}
-          <div className="pt-3 border-t border-gray-200 dark:border-[#374151] space-y-2">
+          <div className="pt-3 border-t border-gray-200 dark:border-[#374151] space-y-2.5">
             <div>
-              <span className="text-xs text-gray-600 dark:text-gray-400 block mb-1">Filename Prefix</span>
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 block mb-1">Filename Prefix</span>
               <input
                 type="text"
                 value={settings.namingPrefix}
@@ -1477,8 +1479,64 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               />
             </div>
 
-            {settings.splitMode === 'grid' && (
-              <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Dynamic Naming Pattern
+                </span>
+                <span className="text-[10px] text-gray-400 font-mono">Agent & Manual</span>
+              </div>
+              <input
+                type="text"
+                value={settings.namingPattern || ''}
+                onChange={(e) => onUpdateSettings({ namingPattern: e.target.value })}
+                placeholder="e.g. {row}-{col}_{timestamp} or {prefix}_{pad_index}"
+                className="w-full px-2.5 py-1.5 text-xs rounded bg-white dark:bg-[#111827] border border-gray-300 dark:border-[#374151] text-gray-900 dark:text-white focus:border-blue-500 outline-none font-mono"
+              />
+              
+              {/* Quick tokens */}
+              <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                <span className="text-[10px] text-gray-400 mr-0.5">Tokens:</span>
+                {[
+                  '{row}-{col}_{timestamp}',
+                  '{prefix}_r{pad_row}_c{pad_col}',
+                  '{prefix}_{pad_index}',
+                  '{row}_{col}',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => onUpdateSettings({ namingPattern: preset })}
+                    className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-gray-200 dark:bg-[#111827] hover:bg-blue-100 dark:hover:bg-blue-900/40 text-gray-700 dark:text-gray-300 hover:text-blue-600 transition-colors border border-gray-300 dark:border-[#374151]"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+
+              {/* Live Preview Sample */}
+              {(() => {
+                const sampleName = formatSliceFilename({
+                  pattern: settings.namingPattern || (settings.includeGridCoordsInName && settings.splitMode === 'grid' ? '{prefix}_r{pad_row}_c{pad_col}' : '{prefix}_{pad_index}'),
+                  prefix: settings.namingPrefix || 'panel',
+                  row: 0,
+                  col: 0,
+                  index: 0,
+                  width: image.width,
+                  height: image.height,
+                  ext: settings.outputFormat === 'jpeg' ? 'jpg' : settings.outputFormat,
+                });
+                return (
+                  <div className="mt-1.5 p-1.5 rounded bg-gray-100 dark:bg-[#111827] border border-gray-200 dark:border-[#1F2937] text-[11px] font-mono text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                    <span className="text-[9px] uppercase tracking-wider font-bold text-blue-600 dark:text-blue-400">Preview:</span>
+                    <span className="truncate text-gray-900 dark:text-white">{sampleName}</span>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {settings.splitMode === 'grid' && !settings.namingPattern && (
+              <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none pt-1">
                 <input
                   type="checkbox"
                   checked={settings.includeGridCoordsInName}

@@ -7,6 +7,8 @@ import { LargeImageModal } from './components/LargeImageModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { ToastContainer } from './components/ToastContainer';
 import { RecentExportsDrawer } from './components/RecentExportsDrawer';
+import { AgentDrawer } from './components/AgentDrawer';
+import { AgentExportModal } from './components/AgentExportModal';
 import { useImageLoader } from './hooks/useImageLoader';
 import { useEditorHistory, DEFAULT_SETTINGS } from './hooks/useEditorHistory';
 import { useToast } from './hooks/useToast';
@@ -14,6 +16,14 @@ import { useRecentExports } from './hooks/useRecentExports';
 import { ProcessingProgress, BatchImageResult } from './types';
 import { calculateSlices, generatePanelOutputs } from './lib/imageEngine';
 import { createAndDownloadBatchZip } from './lib/exportUtils';
+import {
+  connectAgentBridge,
+  disconnectAgentBridge,
+  initializeWebMcpTools,
+  setPendingExport,
+  subscribeAgentState,
+} from './agent/tools';
+import { PendingExportRequest } from './agent/types';
 
 export default function App() {
   // Theme management with localStorage persistence
@@ -42,6 +52,20 @@ export default function App() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isRecentExportsOpen, setIsRecentExportsOpen] = useState(false);
   const { recentExports, addRecentExport, clearRecentExports } = useRecentExports();
+  
+  // Agent Access layer state
+  const [isAgentDrawerOpen, setIsAgentDrawerOpen] = useState(false);
+  const [isAgentPaused, setIsAgentPaused] = useState(false);
+  const [pendingAgentExport, setPendingAgentExport] = useState<PendingExportRequest | null>(null);
+  const [agentHighlight, setAgentHighlight] = useState<string | null>(null);
+  const workspaceBridgeRef = useRef<{
+    getSlices: () => any[];
+    getPanels: () => any[];
+    reorderPanels: (newOrder: number[]) => void;
+    renamePanel: (index: number, newName: string) => void;
+    downloadZip: () => Promise<void>;
+  } | null>(null);
+
   const [progress, setProgress] = useState<ProcessingProgress>({
     active: false,
     current: 0,
@@ -81,19 +105,27 @@ export default function App() {
     clearImage,
     setError,
   } = useImageLoader((loaded, totalCount) => {
-    // Automatically configure 4K Ultra-HD Quality Enhancement on upload
+    // Automatically configure 8K Ultra-HD Crystal Clear Quality Enhancement on upload
     updateSettings({
-      enhanceTo4K: true,
-      resolutionMode: '4k',
+      enhanceTo8K: true,
+      enhanceTo4K: false,
+      resolutionMode: '8k',
+      upscaleTarget: 'panel',
+      storyboardEnhance: true,
+      progressiveUpscale: true,
       sharpnessBoost: true,
+      sharpnessLevel: 'studio8k',
+      clarityBoost: true,
+      contrast: 105,
       quality: 100,
+      outputFormat: 'png',
     });
     const batchSummary = (totalCount && totalCount > 1)
       ? `Batch of ${totalCount} images loaded!`
       : `${loaded.name} (${loaded.width} × ${loaded.height} px)`;
     addToast(
-      '4K Ultra HD Export Active',
-      `${batchSummary} — Slices will be automatically enhanced to 4K resolution on export.`,
+      '8K Crystal Clear Master Active',
+      `${batchSummary} — Slices will be enhanced up to 8K Ultra-HD (7680px) with Studio 8K razor-sharp clarity and zero blur.`,
       'success'
     );
   });
@@ -261,6 +293,161 @@ export default function App() {
     }
   }, [images, image, settings, setProgress, addToast]);
 
+  // Initialize WebMCP tools and listen for agent state changes
+  useEffect(() => {
+    initializeWebMcpTools();
+    const unsubscribe = subscribeAgentState((agState) => {
+      setIsAgentPaused(agState.isPaused);
+      setPendingAgentExport(agState.pendingExportRequest);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Connect active React application state to the agent bridge
+  useEffect(() => {
+    connectAgentBridge({
+      loadImageFromUrl: async (url: string) => {
+        const cleanName = url.split('/').pop()?.split('?')[0] || 'remote_image.png';
+        await loadImageFromUrl(url, cleanName);
+      },
+      loadImageFromClipboard: async () => {
+        await handlePasteRequested();
+      },
+      triggerFilePicker: () => {
+        handleTriggerUpload();
+      },
+      getImageInfo: () => {
+        if (!image) return null;
+        return {
+          name: image.name,
+          width: image.width,
+          height: image.height,
+          size: image.size,
+          type: image.type || 'image/png',
+          aspectRatio: (image.width / image.height).toFixed(3),
+        };
+      },
+      getSettings: () => settings,
+      updateSettings: (updater: any) => {
+        updateSettings(updater, true);
+      },
+      undo: () => {
+        if (canUndo) undo();
+      },
+      redo: () => {
+        if (canRedo) redo();
+      },
+      reset: () => {
+        resetSettings();
+      },
+      getSlices: () => {
+        if (workspaceBridgeRef.current?.getSlices) {
+          return workspaceBridgeRef.current.getSlices();
+        }
+        if (image) {
+          return calculateSlices(image.width, image.height, settings);
+        }
+        return [];
+      },
+      getGeneratedPanels: () => {
+        return workspaceBridgeRef.current?.getPanels() || [];
+      },
+      reorderPanels: (newOrder: number[]) => {
+        workspaceBridgeRef.current?.reorderPanels(newOrder);
+      },
+      renamePanel: (index: number, newName: string) => {
+        workspaceBridgeRef.current?.renamePanel(index, newName);
+      },
+      triggerExportZip: async () => {
+        if (workspaceBridgeRef.current?.downloadZip) {
+          await workspaceBridgeRef.current.downloadZip();
+        } else {
+          await handleBatchExportZip();
+        }
+      },
+      openVideoDrawer: () => {
+        workspaceBridgeRef.current?.openVideoDrawer?.();
+      },
+      closeVideoDrawer: () => {
+        workspaceBridgeRef.current?.closeVideoDrawer?.();
+      },
+      getVideoSettings: () => {
+        return workspaceBridgeRef.current?.getVideoSettings?.();
+      },
+      updateVideoSettings: (updates) => {
+        workspaceBridgeRef.current?.updateVideoSettings?.(updates);
+      },
+      applyVideoPreset: (presetName) => {
+        workspaceBridgeRef.current?.applyVideoPreset?.(presetName);
+      },
+      setSlideMotion: (args) => {
+        workspaceBridgeRef.current?.setSlideMotion?.(args);
+      },
+      setSlideCaption: (args) => {
+        workspaceBridgeRef.current?.setSlideCaption?.(args);
+      },
+      previewVideo: (args) => {
+        workspaceBridgeRef.current?.previewVideo?.(args);
+      },
+      triggerRenderVideo: async () => {
+        if (workspaceBridgeRef.current?.triggerRenderVideo) {
+          await workspaceBridgeRef.current.triggerRenderVideo();
+        }
+      },
+      cancelRenderVideo: () => {
+        workspaceBridgeRef.current?.cancelRenderVideo?.();
+      },
+      isRenderingVideo: () => {
+        return Boolean(workspaceBridgeRef.current?.isRenderingVideo?.());
+      },
+      showToast: (title, desc, type) => {
+        addToast(title, desc, type);
+      },
+      setHighlight: (target: string | null) => {
+        setAgentHighlight(target);
+      },
+    });
+
+    return () => {
+      disconnectAgentBridge();
+    };
+  }, [
+    image,
+    settings,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    resetSettings,
+    updateSettings,
+    loadImageFromUrl,
+    handleBatchExportZip,
+    addToast,
+  ]);
+
+  const handleAllowAgentExport = async () => {
+    const isVideo = pendingAgentExport?.type === 'video';
+    setPendingAgentExport(null);
+    setPendingExport(null);
+    if (isVideo) {
+      if (workspaceBridgeRef.current?.triggerRenderVideo) {
+        await workspaceBridgeRef.current.triggerRenderVideo();
+      }
+    } else {
+      if (workspaceBridgeRef.current?.downloadZip) {
+        await workspaceBridgeRef.current.downloadZip();
+      } else {
+        await handleBatchExportZip();
+      }
+    }
+  };
+
+  const handleDeclineAgentExport = () => {
+    setPendingAgentExport(null);
+    setPendingExport(null);
+    addToast('Export Cancelled', 'Human user declined the agent export request.', 'info');
+  };
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans transition-colors selection:bg-emerald-500 selection:text-white">
       {/* Hidden file input for programmatically opening file picker */}
@@ -273,12 +460,14 @@ export default function App() {
         onChange={handleFileInputChange}
       />
 
-      {/* Main Header with dedicated Download All as Zip button */}
+      {/* Main Header with dedicated Download All as Zip and Agent Access buttons */}
       <AppHeader
         theme={theme}
         toggleTheme={toggleTheme}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onOpenRecentExports={() => setIsRecentExportsOpen(true)}
+        onOpenAgent={() => setIsAgentDrawerOpen(true)}
+        isAgentPaused={isAgentPaused}
         hasImage={!!image}
         batchCount={images.length}
         onNewImage={handleTriggerUpload}
@@ -322,6 +511,10 @@ export default function App() {
             progress={progress}
             setProgress={setProgress}
             onBatchExportZip={handleBatchExportZip}
+            agentHighlight={agentHighlight}
+            onRegisterWorkspaceBridge={(methods) => {
+              workspaceBridgeRef.current = methods;
+            }}
           />
         )}
       </main>
@@ -360,6 +553,21 @@ export default function App() {
         onClose={() => setIsRecentExportsOpen(false)}
         recentExports={recentExports}
         onClear={clearRecentExports}
+      />
+
+      {/* AI Agent Access Drawer */}
+      <AgentDrawer
+        isOpen={isAgentDrawerOpen}
+        onClose={() => setIsAgentDrawerOpen(false)}
+        onToast={addToast}
+      />
+
+      {/* Agent Export Gesture Confirmation Modal */}
+      <AgentExportModal
+        request={pendingAgentExport}
+        onAllow={handleAllowAgentExport}
+        onDecline={handleDeclineAgentExport}
+        isExporting={isExporting}
       />
     </div>
   );

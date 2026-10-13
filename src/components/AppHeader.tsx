@@ -10,6 +10,7 @@ import {
   FileArchive,
   Sparkles,
   History,
+  Bot,
 } from 'lucide-react';
 
 interface AppHeaderProps {
@@ -17,6 +18,8 @@ interface AppHeaderProps {
   toggleTheme: () => void;
   onOpenShortcuts: () => void;
   onOpenRecentExports?: () => void;
+  onOpenAgent?: () => void;
+  isAgentPaused?: boolean;
   hasImage: boolean;
   batchCount?: number;
   onNewImage: () => void;
@@ -32,6 +35,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   toggleTheme,
   onOpenShortcuts,
   onOpenRecentExports,
+  onOpenAgent,
+  isAgentPaused = false,
   hasImage,
   batchCount,
   onNewImage,
@@ -124,6 +129,26 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 </button>
               )}
             </>
+          )}
+
+          {/* Agent Access Trigger */}
+          {onOpenAgent && (
+            <button
+              id="btn-header-agent"
+              type="button"
+              onClick={onOpenAgent}
+              aria-label="Agent Access"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 transition-colors shadow-2xs"
+              title="Open AI Agent Access Drawer"
+            >
+              <Bot className="w-3.5 h-3.5" />
+              <span className="font-semibold">Agent</span>
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isAgentPaused ? 'bg-amber-500' : 'bg-emerald-500'
+                }`}
+              />
+            </button>
           )}
 
           {/* Recent Exports Trigger */}

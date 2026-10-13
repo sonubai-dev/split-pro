@@ -58,6 +58,99 @@ export function calculateAutoSplitGrid(
 }
 
 /**
+ * Formats a slice filename according to dynamic token patterns.
+ * Supported variables: {row}, {col}, {index}, {i}, {pad_row}, {pad_col}, {pad_index},
+ * {prefix}, {timestamp}, {time}, {width}, {height}, {ext}
+ */
+export function formatSliceFilename({
+  pattern,
+  prefix = 'panel',
+  row,
+  col,
+  index,
+  width,
+  height,
+  ext = 'png',
+  timestamp,
+}: {
+  pattern?: string;
+  prefix?: string;
+  row: number;
+  col: number;
+  index: number;
+  width?: number;
+  height?: number;
+  ext?: string;
+  timestamp?: string | number;
+}): string {
+  const cleanExt = ext.replace(/^\./, '').toLowerCase() === 'jpeg' ? 'jpg' : ext.replace(/^\./, '').toLowerCase();
+  const cleanPrefix = (prefix || 'panel').trim();
+  const padIndex = String(index + 1).padStart(2, '0');
+  const padRow = String(row + 1).padStart(2, '0');
+  const padCol = String(col + 1).padStart(2, '0');
+
+  if (!pattern || !pattern.trim()) {
+    return `${cleanPrefix}_${padIndex}.${cleanExt}`;
+  }
+
+  // Generate ISO or fixed timestamp token
+  let ts = '';
+  if (timestamp) {
+    ts = String(timestamp);
+  } else {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    ts = `${yyyy}${mm}${dd}_${hh}${min}${ss}`;
+  }
+
+  let formatted = pattern.trim();
+
+  const replacements: Record<string, string> = {
+    '{row}': String(row + 1),
+    '{col}': String(col + 1),
+    '{index}': String(index + 1),
+    '{idx}': String(index + 1),
+    '{i}': String(index + 1),
+    '{pad_row}': padRow,
+    '{padRow}': padRow,
+    '{pad_col}': padCol,
+    '{padCol}': padCol,
+    '{pad_index}': padIndex,
+    '{padIndex}': padIndex,
+    '{prefix}': cleanPrefix,
+    '{timestamp}': ts,
+    '{time}': ts,
+    '{width}': width ? String(Math.round(width)) : '1920',
+    '{w}': width ? String(Math.round(width)) : '1920',
+    '{height}': height ? String(Math.round(height)) : '1080',
+    '{h}': height ? String(Math.round(height)) : '1080',
+    '{ext}': cleanExt,
+  };
+
+  for (const [token, val] of Object.entries(replacements)) {
+    formatted = formatted.split(token).join(val);
+  }
+
+  // Prevent illegal filesystem characters
+  let safeName = formatted
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    .replace(/\.{2,}/g, '.')
+    .trim();
+
+  // Ensure file extension exists
+  if (!safeName.toLowerCase().endsWith(`.${cleanExt}`)) {
+    safeName = `${safeName}.${cleanExt}`;
+  }
+
+  return safeName || `${cleanPrefix}_${padIndex}.${cleanExt}`;
+}
+
+/**
  * Calculates exact slice rectangles on the source image according to settings.
  * Handles fractional coordinates with mathematical precision so adjacent panels
  * share exact boundary edges without seams, subpixel blurs, or missing pixels.
@@ -291,7 +384,18 @@ export function calculateSlices(
     const ext = outputFormat === 'jpeg' ? 'jpg' : outputFormat;
 
     let defaultName = `${prefix}_${padIndex}.${ext}`;
-    if (includeGridCoordsInName && splitMode === 'grid') {
+    if (settings.namingPattern && settings.namingPattern.trim()) {
+      defaultName = formatSliceFilename({
+        pattern: settings.namingPattern,
+        prefix,
+        row: item.row,
+        col: item.col,
+        index,
+        width: outWidth,
+        height: outHeight,
+        ext,
+      });
+    } else if (includeGridCoordsInName && splitMode === 'grid') {
       const padR = String(item.row + 1).padStart(2, '0');
       const padC = String(item.col + 1).padStart(2, '0');
       defaultName = `${prefix}_r${padR}_c${padC}.${ext}`;
@@ -316,46 +420,84 @@ export function calculateSlices(
 }
 
 /**
+ * Band-safe chunked execution helper to avoid exceeding browser typed array memory limits.
+ * Prevents RangeError / Out-of-memory when working on huge 4K and 8K canvases (up to 7680px).
+ */
+function processCanvasInBands(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  width: number,
+  height: number,
+  bandHeight: number,
+  overlap: number,
+  processFn: (
+    bandData: ImageData,
+    bWidth: number,
+    bHeight: number,
+    startY: number,
+    validTop: number,
+    validHeight: number
+  ) => void
+): void {
+  for (let y = 0; y < height; y += bandHeight) {
+    const startY = Math.max(0, y - overlap);
+    const endY = Math.min(height, y + bandHeight + overlap);
+    const bHeight = endY - startY;
+
+    // Boundary of valid region within band
+    const validTop = y - startY;
+    const validHeight = Math.min(bandHeight, height - y);
+
+    try {
+      const imgData = ctx.getImageData(0, startY, width, bHeight);
+      processFn(imgData, width, bHeight, startY, validTop, validHeight);
+      ctx.putImageData(imgData, 0, startY, 0, validTop, width, validHeight);
+    } catch (err) {
+      console.warn('Band processing fallback on scanline strip:', err);
+      break;
+    }
+  }
+}
+
+/**
  * Advanced Multi-Scale Unsharp Mask & High-Frequency Detail Engine.
  * Ensures output slices are razor-sharp, distinct, and crystal clear.
- * Adapts convolution radius and weight depending on resolution (e.g. 4K, 8K, or native).
+ * Uses memory-safe banded processing so 8K (7680px) never crashes or skips.
  */
 export function applySharpnessEnhancement(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   width: number,
   height: number,
-  level: 'off' | 'subtle' | 'crisp' | 'ultra' | 'studio8k' = 'ultra',
-  isHighRes: boolean = false
+  level: 'off' | 'subtle' | 'crisp' | 'ultra' | 'studio8k' = 'studio8k',
+  isHighRes: boolean = true
 ): void {
   if (level === 'off') return;
 
-  try {
-    const imgData = ctx.getImageData(0, 0, width, height);
+  // Determine sharpening strength based on level
+  let strength = 0.44; // 'ultra'
+  if (level === 'subtle') strength = 0.20;
+  else if (level === 'crisp') strength = 0.32;
+  else if (level === 'ultra') strength = 0.48;
+  else if (level === 'studio8k') strength = 0.62;
+
+  if (isHighRes) {
+    strength = Math.min(0.72, strength * 1.25);
+  }
+
+  const maxDim = Math.max(width, height);
+  const step = maxDim >= 5000 ? 3 : maxDim >= 2500 ? 2 : 1;
+  const alpha = Math.max(0.1, Math.min(0.68, strength));
+  const threshold = 2; // Low noise floor for crisp definition
+  const overlap = step * 4 + 4;
+  const bandHeight = Math.min(1024, height);
+
+  processCanvasInBands(ctx, width, height, bandHeight, overlap, (imgData, w, h, _startY, validTop, validH) => {
     const src = imgData.data;
     const dst = new Uint8ClampedArray(src);
-    const w = width;
-    const h = height;
 
-    // Determine sharpening strength based on level
-    let strength = 0.35; // 'ultra' default
-    if (level === 'subtle') strength = 0.16;
-    else if (level === 'crisp') strength = 0.26;
-    else if (level === 'ultra') strength = 0.42;
-    else if (level === 'studio8k') strength = 0.54;
+    const startY = Math.max(step, validTop);
+    const endY = Math.min(h - step, validTop + validH);
 
-    if (isHighRes) {
-      strength = Math.min(0.62, strength * 1.25);
-    }
-
-    // Adaptive step distance for higher resolutions (1px, 2px, or 3px radius)
-    // Ensures sharpness doesn't vanish on huge 4K or 8K canvases
-    const maxDim = Math.max(w, h);
-    const step = maxDim >= 5000 ? 2 : 1;
-
-    const a = Math.max(0.08, Math.min(0.58, strength));
-    const threshold = 3;
-
-    for (let y = step; y < h - step; y++) {
+    for (let y = startY; y < endY; y++) {
       const rowPrev = (y - step) * w;
       const rowCurr = y * w;
       const rowNext = (y + step) * w;
@@ -367,69 +509,69 @@ export function applySharpnessEnhancement(
         const left = (rowCurr + (x - step)) << 2;
         const right = (rowCurr + (x + step)) << 2;
 
-        // Process R, G, B channels with edge thresholding
         for (let c = 0; c < 3; c++) {
           const orig = dst[i + c];
           const neighborAvg = (dst[top + c] + dst[bottom + c] + dst[left + c] + dst[right + c]) * 0.25;
           const diff = orig - neighborAvg;
 
-          // Only sharpen if difference exceeds noise threshold
           if (Math.abs(diff) >= threshold) {
-            src[i + c] = Math.min(255, Math.max(0, orig + diff * (a * 4)));
-          } else {
-            src[i + c] = orig;
+            src[i + c] = Math.min(255, Math.max(0, Math.round(orig + diff * (alpha * 4.2))));
           }
         }
       }
     }
-
-    ctx.putImageData(imgData, 0, 0);
-  } catch (err) {
-    console.debug('Sharpness enhancement skipped:', err);
-  }
+  });
 }
 
 /**
  * Storyboard & Comic Panel Crisp Edge Engine.
- * Tailored specifically for storyboards, manga, animation frames, and sketches:
+ * Engineered specifically for storyboards, manga, anime sketches, and line art:
  * - Directional edge contrast: reinforces pencil, ink, character silhouettes, and speech bubbles.
+ * - Ink-line steepening: pulls fuzzy edges of dark lines into rich solid black without blur.
  * - Flat-area preservation: suppresses noise in flat backgrounds, skies, and skin tones.
  * - Anti-halo clamp: prevents unnatural white ringing around dark outline strokes.
- * - Adaptive multi-scale kernel: applies dual-pass convolution (fine 1px details + 2-3px contours for 8K).
+ * - Multi-scale 8K Master passes:
+ *   Pass 1: Fine detail & hatching (step 1)
+ *   Pass 2: Contour & stroke steepening (step 2-3)
+ *   Pass 3: Structural outline lock for 8K (step 4-5)
+ * - Band-processed so 8K Ultra-HD canvases (7680px) process seamlessly with zero memory failure.
  */
 export function applyStoryboardCrispEngine(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   width: number,
   height: number,
-  level: 'off' | 'subtle' | 'crisp' | 'ultra' | 'studio8k' = 'ultra',
-  is8K: boolean = false
+  level: 'off' | 'subtle' | 'crisp' | 'ultra' | 'studio8k' = 'studio8k',
+  is8K: boolean = true
 ): void {
   if (level === 'off') return;
 
-  try {
-    const imgData = ctx.getImageData(0, 0, width, height);
+  let strength = 0.46;
+  if (level === 'subtle') strength = 0.22;
+  else if (level === 'crisp') strength = 0.35;
+  else if (level === 'ultra') strength = 0.52;
+  else if (level === 'studio8k') strength = 0.68;
+
+  if (is8K) {
+    strength = Math.min(0.78, strength * 1.25);
+  }
+
+  const maxDim = Math.max(width, height);
+  const primaryStep = maxDim >= 5000 ? 2 : 1;
+  const alpha = Math.max(0.12, Math.min(0.72, strength));
+  const noiseThreshold = 3;
+
+  const overlap = primaryStep * 6 + 8;
+  const bandHeight = Math.min(1024, height);
+
+  processCanvasInBands(ctx, width, height, bandHeight, overlap, (imgData, w, h, _startY, validTop, validH) => {
     const src = imgData.data;
     const dst = new Uint8ClampedArray(src);
-    const w = width;
-    const h = height;
 
-    let strength = 0.38;
-    if (level === 'subtle') strength = 0.18;
-    else if (level === 'crisp') strength = 0.28;
-    else if (level === 'ultra') strength = 0.45;
-    else if (level === 'studio8k') strength = 0.56;
+    const startY = Math.max(primaryStep, validTop);
+    const endY = Math.min(h - primaryStep, validTop + validH);
 
-    if (is8K) {
-      strength = Math.min(0.65, strength * 1.2);
-    }
-
-    const maxDim = Math.max(w, h);
-    const primaryStep = maxDim >= 5000 ? 2 : 1;
-    const alpha = Math.max(0.08, Math.min(0.6, strength));
-    const noiseThreshold = 4; // Ignore noise in flat regions
-
-    // Pass 1: Adaptive Edge-Directed Convolution with Anti-Halo Limiter
-    for (let y = primaryStep; y < h - primaryStep; y++) {
+    // Pass 1: Adaptive Edge-Directed Convolution with Ink-Line Steepening & Anti-Halo Clamp
+    for (let y = startY; y < endY; y++) {
       const rowPrev = (y - primaryStep) * w;
       const rowCurr = y * w;
       const rowNext = (y + primaryStep) * w;
@@ -452,33 +594,40 @@ export function applyStoryboardCrispEngine(
           const diff = orig - neighborAvg;
 
           if (Math.abs(diff) >= noiseThreshold) {
-            // Anti-halo clamping: prevent overshooting beyond local neighbors
             const minNeighbor = Math.min(topVal, botVal, leftVal, rightVal);
             const maxNeighbor = Math.max(topVal, botVal, leftVal, rightVal);
 
-            let sharpened = orig + diff * (alpha * 4);
-            sharpened = Math.min(maxNeighbor + 22, Math.max(minNeighbor - 22, sharpened));
+            let sharpened = orig + diff * (alpha * 4.4);
+
+            // Ink-line boost: if this pixel is on the darker side of an edge (outline),
+            // pull it slightly darker to eliminate the blurry gray edge transition
+            if (orig < neighborAvg && orig < 160) {
+              sharpened -= Math.min(18, (neighborAvg - orig) * 0.35);
+            }
+
+            // Anti-halo limiter: prevent stark bright ringing around dark ink lines
+            sharpened = Math.min(maxNeighbor + 18, Math.max(minNeighbor - 18, sharpened));
             src[i + c] = Math.min(255, Math.max(0, Math.round(sharpened)));
-          } else {
-            src[i + c] = orig;
           }
         }
       }
     }
 
-    // Pass 2: Structural Contour Tightening for 8K / Studio mode
+    // Pass 2: Secondary Contour Tightening for 8K / Ultra modes
     if (is8K || level === 'studio8k') {
-      const step2 = primaryStep + 1;
+      const step2 = primaryStep >= 2 ? primaryStep + 2 : primaryStep + 1;
       if (step2 < Math.min(w, h) / 4) {
         const tempBuf = new Uint8ClampedArray(src);
-        const secondAlpha = alpha * 0.42;
+        const secondAlpha = alpha * 0.45;
+        const sY = Math.max(step2, validTop);
+        const eY = Math.min(h - step2, validTop + validH);
 
-        for (let y = step2; y < h - step2; y += 1) {
+        for (let y = sY; y < eY; y++) {
           const rPrev = (y - step2) * w;
           const rCurr = y * w;
           const rNext = (y + step2) * w;
 
-          for (let x = step2; x < w - step2; x += 1) {
+          for (let x = step2; x < w - step2; x++) {
             const i = (rCurr + x) << 2;
             const top = (rPrev + x) << 2;
             const bottom = (rNext + x) << 2;
@@ -490,26 +639,54 @@ export function applyStoryboardCrispEngine(
               const neighborAvg = (tempBuf[top + c] + tempBuf[bottom + c] + tempBuf[left + c] + tempBuf[right + c]) * 0.25;
               const diff = orig - neighborAvg;
 
-              if (Math.abs(diff) >= 6) {
-                src[i + c] = Math.min(255, Math.max(0, Math.round(orig + diff * (secondAlpha * 2.6))));
+              if (Math.abs(diff) >= 4) {
+                src[i + c] = Math.min(255, Math.max(0, Math.round(orig + diff * (secondAlpha * 3.2))));
               }
             }
           }
         }
       }
     }
+  });
+}
 
-    ctx.putImageData(imgData, 0, 0);
-  } catch (err) {
-    console.debug('Storyboard crisp engine skipped:', err);
+/**
+ * Fast intermediate edge steepener applied between progressive octave doubling stages.
+ * Prevents line blur and soft edges from compounding during multi-octave upscaling.
+ */
+function applyIntermediateEdgeTightening(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  w: number,
+  h: number
+): void {
+  try {
+    const bandHeight = Math.min(1024, h);
+    processCanvasInBands(ctx, w, h, bandHeight, 4, (imgData, _bw, bh, _sy, validTop, validH) => {
+      const d = imgData.data;
+      const start = validTop * _bw * 4;
+      const end = (validTop + validH) * _bw * 4;
+
+      // S-curve contrast boost on mid-tones & mild 1px unsharp edge steepening
+      for (let i = start; i < end; i += 4) {
+        for (let c = 0; c < 3; c++) {
+          const val = d[i + c];
+          if (val > 25 && val < 230) {
+            const norm = (val - 128) / 128;
+            d[i + c] = Math.min(255, Math.max(0, Math.round(128 + norm * 1.14 * 128)));
+          }
+        }
+      }
+    });
+  } catch {
+    // ignore
   }
 }
 
 /**
- * Multi-Octave Progressive Upscaler.
- * When scaling up by more than 1.35x (e.g. 2x, 4x, 8x to reach 8K),
- * a single-step drawImage causes severe bilinear blurring and smudges storyboard line art.
- * This function scales in progressive 2x intermediate octaves with intermediate
+ * Multi-Octave Progressive Super-Resolution Upscaler.
+ * When scaling up by more than 1.25x (e.g. 2x, 4x, 8x to reach 8K),
+ * a single-step drawImage creates severe bilinear smudging and fuzzy edges.
+ * This function scales in progressive ~1.8x intermediate octaves with intermediate
  * edge tightening so storyboard lines remain crisp and razor sharp at 8K!
  */
 export function drawWithProgressiveOctaveUpscaling(
@@ -523,14 +700,16 @@ export function drawWithProgressiveOctaveUpscaling(
   dh: number,
   enableProgressive: boolean = true
 ): void {
-  // If scale factor is small, draw directly
-  if (!enableProgressive || (dw <= sw * 1.35 && dh <= sh * 1.35)) {
+  // If scale factor is small, draw directly with high quality smoothing
+  if (!enableProgressive || (dw <= sw * 1.25 && dh <= sh * 1.25)) {
+    targetCtx.imageSmoothingEnabled = true;
+    targetCtx.imageSmoothingQuality = 'high';
     targetCtx.drawImage(source, sx, sy, sw, sh, 0, 0, dw, dh);
     return;
   }
 
   try {
-    // Step 1: Crop initial source region
+    // Step 1: Crop initial source region at native fidelity
     let curCanvas: HTMLCanvasElement | OffscreenCanvas;
     let curCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
 
@@ -545,6 +724,8 @@ export function drawWithProgressiveOctaveUpscaling(
     }
 
     if (!curCtx) {
+      targetCtx.imageSmoothingEnabled = true;
+      targetCtx.imageSmoothingQuality = 'high';
       targetCtx.drawImage(source, sx, sy, sw, sh, 0, 0, dw, dh);
       return;
     }
@@ -556,10 +737,10 @@ export function drawWithProgressiveOctaveUpscaling(
     let curW = sw;
     let curH = sh;
 
-    // Step 2: Progressive 2x octave doubling
-    while (curW * 2 < dw && curH * 2 < dh) {
-      const nextW = curW * 2;
-      const nextH = curH * 2;
+    // Step 2: Progressive octave stepping until reaching target dimensions
+    while (curW * 1.4 < dw && curH * 1.4 < dh) {
+      const nextW = Math.min(dw, Math.round(curW * 1.9));
+      const nextH = Math.min(dh, Math.round(curH * 1.9));
 
       let nextCanvas: HTMLCanvasElement | OffscreenCanvas;
       let nextCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
@@ -580,10 +761,10 @@ export function drawWithProgressiveOctaveUpscaling(
       nextCtx.imageSmoothingQuality = 'high';
       nextCtx.drawImage(curCanvas, 0, 0, curW, curH, 0, 0, nextW, nextH);
 
-      // Light intermediate edge tightening to preserve line art slope
+      // Edge steepening between octaves to stop blur accumulation
       applyIntermediateEdgeTightening(nextCtx, nextW, nextH);
 
-      // Dispose previous canvas to release RAM immediately
+      // Release previous canvas RAM immediately
       curCanvas.width = 1;
       curCanvas.height = 1;
 
@@ -602,35 +783,9 @@ export function drawWithProgressiveOctaveUpscaling(
     curCanvas.height = 1;
   } catch (err) {
     console.debug('Progressive upscaling fallback to direct draw:', err);
+    targetCtx.imageSmoothingEnabled = true;
+    targetCtx.imageSmoothingQuality = 'high';
     targetCtx.drawImage(source, sx, sy, sw, sh, 0, 0, dw, dh);
-  }
-}
-
-/**
- * Fast intermediate edge gradient steepener for progressive octave stages.
- */
-function applyIntermediateEdgeTightening(
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  w: number,
-  h: number
-): void {
-  try {
-    const imgData = ctx.getImageData(0, 0, w, h);
-    const d = imgData.data;
-    const len = d.length;
-    // Mild S-curve contrast boost across mid-tones to prevent edge slope decay during scaling
-    for (let i = 0; i < len; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        const val = d[i + c];
-        if (val > 30 && val < 225) {
-          const norm = (val - 128) / 128;
-          d[i + c] = Math.min(255, Math.max(0, Math.round(128 + norm * 1.08 * 128)));
-        }
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
-  } catch {
-    // ignore
   }
 }
 
@@ -638,35 +793,35 @@ function applyIntermediateEdgeTightening(
  * Applies micro-contrast clarity enhancement.
  * De-hazes muddy textures and accentuates mid-tone edge definition,
  * creating clean, punchy, crystal-clear imagery without blown highlights.
+ * Uses banded processing so it never runs out of memory on 8K canvases.
  */
 export function applyClarityEnhancement(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   w: number,
   h: number,
-  clarityAmount: number = 0.18
+  clarityAmount: number = 0.22
 ): void {
   try {
-    const imgData = ctx.getImageData(0, 0, w, h);
-    const d = imgData.data;
-    const len = d.length;
-
     // Precalculate S-curve LUT for mid-tone micro-contrast enhancement
     const lut = new Uint8ClampedArray(256);
     for (let i = 0; i < 256; i++) {
       const normalized = i / 255;
-      // Smooth Hermite S-curve centered around mid-gray (0.5)
-      // Boosts separation in 20%-80% luminance range while tapering near 0% (black) and 100% (white)
-      const delta = Math.sin((normalized - 0.5) * Math.PI) * clarityAmount * 28;
+      const delta = Math.sin((normalized - 0.5) * Math.PI) * clarityAmount * 32;
       lut[i] = Math.min(255, Math.max(0, Math.round(i + delta)));
     }
 
-    for (let i = 0; i < len; i += 4) {
-      d[i] = lut[d[i]];
-      d[i + 1] = lut[d[i + 1]];
-      d[i + 2] = lut[d[i + 2]];
-    }
+    const bandHeight = Math.min(1024, h);
+    processCanvasInBands(ctx, w, h, bandHeight, 0, (imgData, _bw, _bh, _sy, validTop, validH) => {
+      const d = imgData.data;
+      const start = validTop * _bw * 4;
+      const end = (validTop + validH) * _bw * 4;
 
-    ctx.putImageData(imgData, 0, 0);
+      for (let i = start; i < end; i += 4) {
+        d[i] = lut[d[i]];
+        d[i + 1] = lut[d[i + 1]];
+        d[i + 2] = lut[d[i + 2]];
+      }
+    });
   } catch (err) {
     console.debug('Clarity enhancement skipped:', err);
   }

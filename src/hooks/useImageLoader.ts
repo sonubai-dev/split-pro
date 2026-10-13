@@ -170,7 +170,7 @@ export function useImageLoader(onImageLoaded?: (img: LoadedImage, totalCount?: n
   );
 
   const loadImageFromUrl = useCallback(
-    async (url: string, name: string) => {
+    async (url: string, name: string = 'remote_image.png') => {
       setError(null);
       setIsLoading(true);
 

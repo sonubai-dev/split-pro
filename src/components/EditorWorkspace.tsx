@@ -15,6 +15,7 @@ import {
   Zap,
   RefreshCw,
   Check,
+  Film,
 } from 'lucide-react';
 import {
   EditorSettings,
@@ -28,6 +29,7 @@ import { ControlPanel } from './ControlPanel';
 import { ImageCanvas } from './ImageCanvas';
 import { PanelResults } from './PanelResults';
 import { PdfExportModal } from './PdfExportModal';
+import { VideoDrawer } from './VideoDrawer';
 import {
   calculateSlices,
   generatePanelOutputs,
@@ -62,6 +64,31 @@ interface EditorWorkspaceProps {
   progress: ProcessingProgress;
   setProgress: React.Dispatch<React.SetStateAction<ProcessingProgress>>;
   onBatchExportZip?: () => Promise<void>;
+  agentHighlight?: string | null;
+  onRegisterWorkspaceBridge?: (methods: {
+    getSlices: () => PanelSlice[];
+    getPanels: () => PanelSlice[];
+    reorderPanels: (newOrder: number[]) => void;
+    renamePanel: (index: number, newName: string) => void;
+    downloadZip: () => Promise<void>;
+    openVideoDrawer?: () => void;
+    closeVideoDrawer?: () => void;
+    getVideoSettings?: () => any;
+    updateVideoSettings?: (updates: any) => void;
+    applyVideoPreset?: (presetName: string) => void;
+    setSlideMotion?: (args: { slideIndex?: number; motion: string; applyToAll?: boolean }) => void;
+    setSlideCaption?: (args: {
+      slideIndex: number;
+      text: string;
+      position?: 'top' | 'bottom';
+      size?: 'small' | 'medium' | 'large';
+      color?: string;
+    }) => void;
+    previewVideo?: (args: { action: 'play' | 'pause' | 'seek'; time?: number }) => void;
+    triggerRenderVideo?: () => Promise<void>;
+    cancelRenderVideo?: () => void;
+    isRenderingVideo?: () => boolean;
+  }) => void;
 }
 
 export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
@@ -85,6 +112,8 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
   progress,
   setProgress,
   onBatchExportZip,
+  agentHighlight,
+  onRegisterWorkspaceBridge,
 }) => {
   // Mobile active tab: 'controls' | 'canvas' | 'results'
   const [mobileTab, setMobileTab] = useState<'controls' | 'canvas' | 'results'>('canvas');
@@ -95,8 +124,10 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
   // Generated full-resolution panels
   const [generatedPanels, setGeneratedPanels] = useState<PanelSlice[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isVideoDrawerOpen, setIsVideoDrawerOpen] = useState(false);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const batchInputRef = useRef<HTMLInputElement>(null);
+  const videoControllerRef = useRef<any>(null);
 
   // Compute live slice boundaries based on current settings
   const currentSlices = useMemo(() => {
@@ -482,6 +513,59 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
     onToast('Panel Renamed', newName, 'info');
   };
 
+  // Sync workspace bridge methods with parent / AI agent layer
+  useEffect(() => {
+    if (!onRegisterWorkspaceBridge) return;
+    onRegisterWorkspaceBridge({
+      getSlices: () => currentSlices,
+      getPanels: () => generatedPanels,
+      reorderPanels: (newOrder: number[]) => {
+        if (generatedPanels.length > 0) {
+          const reordered: PanelSlice[] = [];
+          newOrder.forEach((newIdx, pos) => {
+            if (generatedPanels[newIdx]) {
+              reordered.push({ ...generatedPanels[newIdx], index: pos + 1 });
+            }
+          });
+          generatedPanels.forEach((p, idx) => {
+            if (!newOrder.includes(idx)) {
+              reordered.push({ ...p, index: reordered.length + 1 });
+            }
+          });
+          setGeneratedPanels(reordered);
+        }
+      },
+      renamePanel: (index: number, newName: string) => {
+        setGeneratedPanels((prev) =>
+          prev.map((p, idx) =>
+            idx === index ? { ...p, customName: newName, filename: newName } : p
+          )
+        );
+      },
+      downloadZip: handleDownloadZip,
+      openVideoDrawer: () => setIsVideoDrawerOpen(true),
+      closeVideoDrawer: () => setIsVideoDrawerOpen(false),
+      getVideoSettings: () => videoControllerRef.current?.getSettings(),
+      updateVideoSettings: (updates: any) => videoControllerRef.current?.updateSettings(updates),
+      applyVideoPreset: (presetName: string) => videoControllerRef.current?.applyPreset(presetName as any),
+      setSlideMotion: (args: any) => videoControllerRef.current?.setSlideMotion(args),
+      setSlideCaption: (args: any) => videoControllerRef.current?.setSlideCaption(args),
+      previewVideo: (args: any) => videoControllerRef.current?.preview(args),
+      triggerRenderVideo: async () => {
+        if (videoControllerRef.current?.render) {
+          await videoControllerRef.current.render();
+        }
+      },
+      cancelRenderVideo: () => videoControllerRef.current?.cancelRender(),
+      isRenderingVideo: () => Boolean(videoControllerRef.current?.isRendering()),
+    });
+  }, [
+    onRegisterWorkspaceBridge,
+    currentSlices,
+    generatedPanels,
+    handleDownloadZip,
+  ]);
+
   // Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -610,6 +694,18 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
               <span>Export ZIP</span>
             </button>
           )}
+
+          {/* Make Video Button next to Export ZIP */}
+          <button
+            type="button"
+            onClick={() => setIsVideoDrawerOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20 transition-all active:scale-95"
+            title="Convert storyboard panels into an animated video"
+          >
+            <Film className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Make Video</span>
+            <span className="sm:hidden">Video</span>
+          </button>
         </div>
       </div>
 
@@ -738,6 +834,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
             onRemoveImage={onRemoveImage}
             onToast={onToast}
             onCloseMobile={() => setMobileTab('canvas')}
+            agentHighlight={agentHighlight}
           />
         </div>
 
@@ -745,7 +842,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
         <div
           className={`flex-1 h-full relative bg-gray-100 dark:bg-[#050505] transition-colors ${
             mobileTab === 'canvas' ? 'block' : 'hidden lg:block'
-          }`}
+          } ${agentHighlight === 'canvas' ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}
         >
           <ImageCanvas
             image={image}
@@ -763,10 +860,11 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
         <div
           className={`w-full lg:w-80 xl:w-96 shrink-0 h-full border-l border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#0D1117] transition-colors ${
             mobileTab === 'results' ? 'block absolute inset-0 z-30 bg-white dark:bg-[#0D1117]' : 'hidden lg:block'
-          }`}
+          } ${agentHighlight === 'results' ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}
         >
           <PanelResults
             panels={generatedPanels}
+            sourceImage={image}
             selectedPanelId={selectedPanelId}
             isGenerating={isGenerating}
             batchCount={images.length}
@@ -776,6 +874,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
             onDownloadAll={handleDownloadAll}
             onDownloadZip={handleDownloadZip}
             onDownloadPdf={handleOpenPdfModal}
+            onOpenVideo={() => setIsVideoDrawerOpen(true)}
             onReorderPanels={(reordered) => setGeneratedPanels(reordered)}
             onRenamePanel={handleRenamePanel}
             onGenerate={handleGeneratePanels}
@@ -791,6 +890,17 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
         onExport={handleExportPdf}
         isExporting={isGenerating}
         panelCount={generatedPanels.length > 0 ? generatedPanels.length : currentSlices.length}
+      />
+
+      {/* Video Storyboard Slideshow Drawer */}
+      <VideoDrawer
+        isOpen={isVideoDrawerOpen}
+        onClose={() => setIsVideoDrawerOpen(false)}
+        panels={generatedPanels.length > 0 ? generatedPanels : currentSlices}
+        onToast={onToast}
+        registerVideoController={(controller) => {
+          videoControllerRef.current = controller;
+        }}
       />
 
       {/* Bottom Minimalist Status Bar (Desktop) */}

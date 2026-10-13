@@ -11,12 +11,18 @@ import {
   Sparkles,
   ExternalLink,
   RefreshCw,
+  Eye,
+  Maximize2,
+  Zap,
+  Film,
 } from 'lucide-react';
-import { PanelSlice } from '../types';
+import { PanelSlice, LoadedImage } from '../types';
 import { formatBytes } from '../lib/imageEngine';
+import { PanelInspectorModal } from './PanelInspectorModal';
 
 interface PanelResultsProps {
   panels: PanelSlice[];
+  sourceImage?: LoadedImage;
   selectedPanelId: string | null;
   isGenerating: boolean;
   batchCount?: number;
@@ -26,6 +32,7 @@ interface PanelResultsProps {
   onDownloadAll: () => void;
   onDownloadZip: () => void;
   onDownloadPdf: () => void;
+  onOpenVideo?: () => void;
   onReorderPanels: (reordered: PanelSlice[]) => void;
   onRenamePanel: (id: string, newName: string) => void;
   onGenerate: () => void;
@@ -34,6 +41,7 @@ interface PanelResultsProps {
 
 export const PanelResults: React.FC<PanelResultsProps> = ({
   panels,
+  sourceImage,
   selectedPanelId,
   isGenerating,
   batchCount,
@@ -43,6 +51,7 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
   onDownloadAll,
   onDownloadZip,
   onDownloadPdf,
+  onOpenVideo,
   onReorderPanels,
   onRenamePanel,
   onGenerate,
@@ -51,6 +60,7 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [inspectingPanel, setInspectingPanel] = useState<PanelSlice | null>(null);
 
   const selectedPanel = panels.find((p) => p.id === selectedPanelId) || panels[0];
 
@@ -153,11 +163,11 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
 
         {/* Global Export Actions */}
         {panels.length > 0 ? (
-          <div className="grid grid-cols-3 gap-1.5 mt-3">
+          <div className="grid grid-cols-4 gap-1.5 mt-3">
             <button
               type="button"
               onClick={onDownloadZip}
-              className={`flex items-center justify-center gap-1 py-2 px-2 rounded text-xs font-semibold shadow-sm transition-all active:scale-[0.98] ${
+              className={`flex items-center justify-center gap-1 py-2 px-1.5 rounded text-xs font-semibold shadow-sm transition-all active:scale-[0.98] ${
                 is8K
                   ? 'bg-purple-600 hover:bg-purple-500 text-white'
                   : 'bg-amber-500 hover:bg-amber-600 text-black'
@@ -165,13 +175,25 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
               title={`Download ${is8K ? '8K Ultra-HD' : is4K ? '4K Ultra-HD' : ''} ZIP archive with all panels`}
             >
               <FileArchive className="w-3.5 h-3.5" />
-              <span>{is8K ? '8K ZIP' : is4K ? '4K ZIP' : 'ZIP All'}</span>
+              <span>{is8K ? '8K ZIP' : is4K ? '4K ZIP' : 'ZIP'}</span>
             </button>
+
+            {onOpenVideo && (
+              <button
+                type="button"
+                onClick={onOpenVideo}
+                className="flex items-center justify-center gap-1 py-2 px-1.5 rounded text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all active:scale-[0.98]"
+                title="Convert storyboard panels into an animated video"
+              >
+                <Film className="w-3.5 h-3.5" />
+                <span>Video</span>
+              </button>
+            )}
 
             <button
               type="button"
               onClick={onDownloadPdf}
-              className="flex items-center justify-center gap-1 py-2 px-2 rounded text-xs font-medium bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-[#374151] hover:border-blue-500/50 transition-colors active:scale-[0.98]"
+              className="flex items-center justify-center gap-1 py-2 px-1.5 rounded text-xs font-medium bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-[#374151] hover:border-blue-500/50 transition-colors active:scale-[0.98]"
               title="Download multi-page PDF document"
             >
               <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
@@ -181,7 +203,7 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
             <button
               type="button"
               onClick={onDownloadAll}
-              className="flex items-center justify-center gap-1 py-2 px-2 rounded text-xs font-medium bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-[#374151] hover:border-blue-500/50 transition-colors active:scale-[0.98]"
+              className="flex items-center justify-center gap-1 py-2 px-1.5 rounded text-xs font-medium bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-[#374151] hover:border-blue-500/50 transition-colors active:scale-[0.98]"
               title="Download all panels as separate files"
             >
               <Download className="w-3.5 h-3.5" />
@@ -279,14 +301,26 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
                         <GripVertical className="w-4 h-4" />
                       </div>
 
-                      {/* Thumbnail Preview */}
-                      <div className="w-12 h-12 rounded bg-gray-200 dark:bg-[#050505] border border-gray-300 dark:border-[#1F2937] overflow-hidden shrink-0 flex items-center justify-center">
+                      {/* Thumbnail Preview with 8K Inspector Trigger */}
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInspectingPanel(panel);
+                        }}
+                        className="relative w-12 h-12 rounded bg-gray-200 dark:bg-[#050505] border border-gray-300 dark:border-[#1F2937] overflow-hidden shrink-0 flex items-center justify-center group/thumb cursor-zoom-in"
+                        title="Click to inspect 8K crystal-clear sharpness in 1:1 zoom"
+                      >
                         {panel.blobUrl ? (
-                          <img
-                            src={panel.blobUrl}
-                            alt={panel.filename}
-                            className="w-full h-full object-cover"
-                          />
+                          <>
+                            <img
+                              src={panel.blobUrl}
+                              alt={panel.filename}
+                              className="w-full h-full object-cover transition-transform group-hover/thumb:scale-110"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity text-white">
+                              <Eye className="w-4 h-4" />
+                            </div>
+                          </>
                         ) : (
                           <span className="text-[9px] font-mono text-gray-500">#{panel.index}</span>
                         )}
@@ -367,18 +401,31 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
                         </div>
                       </div>
 
-                      {/* Download Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDownloadSingle(panel);
-                        }}
-                        className="p-1.5 rounded bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors border border-gray-300 dark:border-[#374151]"
-                        title="Download this panel"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
+                      {/* Action Buttons: Inspect 8K & Download */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInspectingPanel(panel);
+                          }}
+                          className="p-1.5 rounded bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 transition-colors border border-purple-200 dark:border-purple-800/50"
+                          title="Inspect 8K crystal-clear sharpness in 1:1 zoom"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDownloadSingle(panel);
+                          }}
+                          className="p-1.5 rounded bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors border border-gray-300 dark:border-[#374151]"
+                          title="Download this panel"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -408,19 +455,44 @@ export const PanelResults: React.FC<PanelResultsProps> = ({
             </div>
             <div>
               <span className="text-gray-400 dark:text-gray-500 block text-[10px]">EXPORT SIZE:</span>
-              <span className="text-blue-600 dark:text-blue-400 font-bold">{selectedPanel.outputWidth} × {selectedPanel.outputHeight}px</span>
+              <span className="text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                {selectedPanel.outputWidth} × {selectedPanel.outputHeight}px
+              </span>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onDownloadSingle(selectedPanel)}
-            className="w-full py-2 px-3 rounded text-xs font-medium bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-[#374151] transition-colors flex items-center justify-center gap-1.5"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Download Selected Panel</span>
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setInspectingPanel(selectedPanel)}
+              className="py-2 px-2.5 rounded text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Inspect 8K Quality</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onDownloadSingle(selectedPanel)}
+              className="py-2 px-2.5 rounded text-xs font-medium bg-gray-100 dark:bg-[#1F2937] hover:bg-gray-200 dark:hover:bg-[#374151] text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-[#374151] transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download</span>
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* 8K Crystal Clear Zoom & Quality Inspector Modal */}
+      {inspectingPanel && sourceImage && (
+        <PanelInspectorModal
+          panel={inspectingPanel}
+          sourceImage={sourceImage}
+          isOpen={Boolean(inspectingPanel)}
+          onClose={() => setInspectingPanel(null)}
+          onDownload={onDownloadSingle}
+        />
       )}
     </div>
   );

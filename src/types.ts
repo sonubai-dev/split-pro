@@ -74,6 +74,7 @@ export interface EditorSettings {
   customWidth?: number;
   customHeight?: number;
   namingPrefix: string;
+  namingPattern?: string; // Dynamic slice naming pattern, e.g. '{row}-{col}_{timestamp}'
   includeGridCoordsInName: boolean;
   fitMode: FitMode;
 }
