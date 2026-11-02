@@ -244,7 +244,7 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
                 <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
                   {isWebMcpAvailable
                     ? 'navigator.modelContext active'
-                    : 'WebMCP not detected (window.SplitPro active)'}
+                    : 'WebMCP not detected (window.VistaroAI active)'}
                 </span>
               </div>
             </div>

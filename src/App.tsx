@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Scissors, PlusCircle } from 'lucide-react';
 import { AppHeader } from './components/AppHeader';
 import { LandingPage } from './components/LandingPage';
+import { Dashboard } from './components/Dashboard';
+import { MotionVideoStudio } from './components/MotionVideoStudio';
 import { EditorWorkspace } from './components/EditorWorkspace';
 import { ProcessingModal } from './components/ProcessingModal';
 import { LargeImageModal } from './components/LargeImageModal';
@@ -52,6 +55,9 @@ export default function App() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isRecentExportsOpen, setIsRecentExportsOpen] = useState(false);
   const { recentExports, addRecentExport, clearRecentExports } = useRecentExports();
+  
+  // View routing: 'home' | 'dashboard' | 'slicer' | 'video'
+  const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'slicer' | 'video'>('home');
   
   // Agent Access layer state
   const [isAgentDrawerOpen, setIsAgentDrawerOpen] = useState(false);
@@ -281,7 +287,18 @@ export default function App() {
         `Successfully saved ${totalSlices} slices from ${totalImages} images into "${zipName}".`,
         'success'
       );
-      addRecentExport({ filename: zipName, count: totalImages });
+      addRecentExport({
+        filename: zipName,
+        count: totalSlices,
+        resolution: resLabel,
+        mode: settings.splitMode,
+        slices: batchOutputs.flatMap((b) => b.panels).slice(0, 9).map((p) => ({
+          index: p.index,
+          name: p.filename,
+          width: p.outputWidth,
+          height: p.outputHeight,
+        })),
+      });
     } catch (err: any) {
       setIsExporting(false);
       setProgress((prev) => ({ ...prev, active: false }));
@@ -460,7 +477,7 @@ export default function App() {
         onChange={handleFileInputChange}
       />
 
-      {/* Main Header with dedicated Download All as Zip and Agent Access buttons */}
+      {/* Main Header with multi-view navigation & agent access */}
       <AppHeader
         theme={theme}
         toggleTheme={toggleTheme}
@@ -474,48 +491,124 @@ export default function App() {
         onDownloadAllZip={handleBatchExportZip}
         isExporting={isExporting}
         hasPanels={false}
-        onGoHome={clearImage}
+        onGoHome={() => setCurrentView('home')}
+        currentView={currentView}
+        onNavigate={(v) => setCurrentView(v)}
       />
 
-      {/* Main Content View */}
+      {/* Main Content View Routing */}
       <main className="flex-1 flex flex-col">
-        {!image ? (
+        {currentView === 'home' && (
           <LandingPage
-            onImageSelected={loadImageFromFile}
-            onImagesSelected={loadImagesFromFiles}
-            onSampleSelected={loadImageFromUrl}
-            onPasteRequested={handlePasteRequested}
-          />
-        ) : (
-          <EditorWorkspace
-            image={image}
-            images={images}
-            activeImageIndex={activeImageIndex}
-            onSelectImageIndex={setActiveImageIndex}
-            onAddImages={loadImagesFromFiles}
-            onRemoveImageIndex={removeImageAtIndex}
-            settings={settings}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onUpdateSettings={updateSettings}
-            onUndo={undo}
-            onRedo={redo}
-            onReset={() => {
-              resetSettings();
-              addToast('Reset', 'Settings restored to defaults.', 'info');
+            onGetStarted={() => setCurrentView('dashboard')}
+            onOpenSlicer={() => setCurrentView('slicer')}
+            onOpenVideoStudio={() => setCurrentView('video')}
+            onImageSelected={(file) => {
+              loadImageFromFile(file);
+              setCurrentView('slicer');
             }}
-            onReplaceImage={handleTriggerUpload}
-            onRemoveImage={clearImage}
+            onImagesSelected={(files) => {
+              loadImagesFromFiles(files);
+              setCurrentView('slicer');
+            }}
+            onSampleSelected={(url) => {
+              loadImageFromUrl(url, 'sample_image.jpg');
+              setCurrentView('slicer');
+            }}
+            onNavigate={(v) => setCurrentView(v)}
+          />
+        )}
+
+        {currentView === 'dashboard' && (
+          <Dashboard
+            onOpenSlicer={() => setCurrentView('slicer')}
+            onOpenVideoStudio={() => setCurrentView('video')}
+            onImageSelected={(file) => {
+              loadImageFromFile(file);
+              setCurrentView('slicer');
+            }}
+            onImagesSelected={(files) => {
+              loadImagesFromFiles(files);
+              setCurrentView('slicer');
+            }}
+            recentExports={recentExports}
+            onClearRecentExports={clearRecentExports}
+            onNavigate={(v) => setCurrentView(v)}
+          />
+        )}
+
+        {currentView === 'video' && (
+          <MotionVideoStudio
+            onBackToDashboard={() => setCurrentView('dashboard')}
+            onNavigate={(v) => setCurrentView(v)}
+            existingPanels={workspaceBridgeRef.current?.getPanels?.() || []}
             onToast={addToast}
-            onExportSuccess={addRecentExport}
-            progress={progress}
-            setProgress={setProgress}
-            onBatchExportZip={handleBatchExportZip}
-            agentHighlight={agentHighlight}
-            onRegisterWorkspaceBridge={(methods) => {
-              workspaceBridgeRef.current = methods;
-            }}
           />
+        )}
+
+        {currentView === 'slicer' && (
+          !image ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-xl mx-auto space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-violet-100 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 flex items-center justify-center mx-auto shadow-sm">
+                <Scissors className="w-7 h-7" />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                  Upload an Image to Start Slicing
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Choose a high-resolution image, comic strip, or panoramic photo to split into grids and panels.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleTriggerUpload}
+                  className="px-5 py-2.5 text-xs font-semibold rounded-xl text-white bg-violet-600 hover:bg-violet-500 shadow-md transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Choose Image File</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentView('dashboard')}
+                  className="px-4 py-2.5 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                >
+                  Back to Dashboard
+                </button>
+              </div>
+            </div>
+          ) : (
+            <EditorWorkspace
+              image={image}
+              images={images}
+              activeImageIndex={activeImageIndex}
+              onSelectImageIndex={setActiveImageIndex}
+              onAddImages={loadImagesFromFiles}
+              onRemoveImageIndex={removeImageAtIndex}
+              settings={settings}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUpdateSettings={updateSettings}
+              onUndo={undo}
+              onRedo={redo}
+              onReset={() => {
+                resetSettings();
+                addToast('Reset', 'Settings restored to defaults.', 'info');
+              }}
+              onReplaceImage={handleTriggerUpload}
+              onRemoveImage={clearImage}
+              onToast={addToast}
+              onExportSuccess={addRecentExport}
+              progress={progress}
+              setProgress={setProgress}
+              onBatchExportZip={handleBatchExportZip}
+              agentHighlight={agentHighlight}
+              onRegisterWorkspaceBridge={(methods) => {
+                workspaceBridgeRef.current = methods;
+              }}
+            />
+          )
         )}
       </main>
 

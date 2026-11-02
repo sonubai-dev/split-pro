@@ -28,6 +28,8 @@ interface AppHeaderProps {
   isExporting?: boolean;
   hasPanels: boolean;
   onGoHome?: () => void;
+  currentView?: 'home' | 'dashboard' | 'slicer' | 'video';
+  onNavigate?: (view: 'home' | 'dashboard' | 'slicer' | 'video') => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -45,39 +47,79 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   isExporting = false,
   hasPanels,
   onGoHome,
+  currentView = 'home',
+  onNavigate,
 }) => {
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#111827] text-gray-800 dark:text-[#E5E7EB] select-none transition-colors">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-[#0B0F17]/90 backdrop-blur-md text-slate-800 dark:text-[#E5E7EB] select-none transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-        {/* Logo & Brand matching Clean Minimalism design */}
+        {/* Left: Brand mark VistaroAI */}
         <div
           id="app-logo-brand"
-          onClick={onGoHome}
-          className="flex items-center gap-3 cursor-pointer group"
+          onClick={() => (onNavigate ? onNavigate('home') : onGoHome?.())}
+          className="flex items-center gap-2.5 cursor-pointer group shrink-0"
         >
-          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-white text-base shadow-sm shadow-blue-900/30 group-hover:bg-blue-500 transition-colors shrink-0">
-            S
+          <div className="w-8 h-8 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg flex items-center justify-center font-extrabold text-sm shadow-sm group-hover:scale-105 transition-transform">
+            V
           </div>
-          <div className="flex flex-col">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-base sm:text-lg font-bold tracking-tight text-gray-900 dark:text-white">
-                SPLIT<span className="text-blue-600 dark:text-blue-500 underline underline-offset-4 decoration-2">PRO</span>
-              </span>
-              {batchCount && batchCount > 1 ? (
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                  {batchCount} IMAGES
-                </span>
-              ) : null}
-            </div>
-            <span className="text-[9px] font-medium tracking-wider uppercase text-gray-400 dark:text-gray-500 -mt-0.5">
-              by <span className="font-semibold text-gray-700 dark:text-gray-300">SOLITA SOLUTIONS</span>
-            </span>
-          </div>
+          <span className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+            Vistaro<span className="text-violet-600 dark:text-violet-400">AI</span>
+          </span>
         </div>
+
+        {/* Center: Navigation Links */}
+        {onNavigate && (
+          <nav className="hidden md:flex items-center gap-1.5 p-1 rounded-xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200/60 dark:border-slate-800/60 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => onNavigate('home')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                currentView === 'home'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Home
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('dashboard')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                currentView === 'dashboard'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('slicer')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                currentView === 'slicer'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Storyboard Slicer
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('video')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                currentView === 'video'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Motion Video Studio
+            </button>
+          </nav>
+        )}
 
         {/* Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {hasImage && (
+          {currentView === 'slicer' && hasImage && (
             <>
               {/* Dedicated "Download All as Zip" button directly in header when multiple images are loaded */}
               {batchCount && batchCount > 1 && onDownloadAllZip && (
@@ -129,6 +171,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 </button>
               )}
             </>
+          )}
+
+          {currentView === 'home' && onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('dashboard')}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg text-white bg-violet-600 hover:bg-violet-500 shadow-sm shadow-violet-900/20 transition-all cursor-pointer"
+            >
+              Get Started
+            </button>
           )}
 
           {/* Agent Access Trigger */}

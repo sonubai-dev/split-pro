@@ -43,6 +43,8 @@ import {
   createAndDownloadPdf,
 } from '../lib/exportUtils';
 
+import { RecentExport } from '../hooks/useRecentExports';
+
 interface EditorWorkspaceProps {
   image: LoadedImage;
   images?: LoadedImage[];
@@ -60,7 +62,7 @@ interface EditorWorkspaceProps {
   onReplaceImage: () => void;
   onRemoveImage: () => void;
   onToast: (title: string, desc?: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
-  onExportSuccess?: (info: { filename: string; count: number }) => void;
+  onExportSuccess?: (info: Omit<RecentExport, 'id' | 'timestamp'>) => void;
   progress: ProcessingProgress;
   setProgress: React.Dispatch<React.SetStateAction<ProcessingProgress>>;
   onBatchExportZip?: () => Promise<void>;
@@ -325,7 +327,60 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
       setIsGenerating(false);
       setProgress((prev) => ({ ...prev, active: false }));
       onToast('ZIP Exported', `Saved ${zipName}`, 'success');
-      onExportSuccess?.({ filename: zipName, count: panelsToZip.length });
+
+      // Generate lightweight thumbnail previews for the Dashboard hover preview
+      const thumbs: string[] = [];
+      try {
+        const previewSlices = panelsToZip.slice(0, 9);
+        for (const p of previewSlices) {
+          if (p.sourceWidth > 0 && p.sourceHeight > 0 && image.imgElement) {
+            const canvas = document.createElement('canvas');
+            const targetW = 120;
+            const targetH = Math.max(1, Math.round(targetW * (p.sourceHeight / p.sourceWidth)));
+            canvas.width = targetW;
+            canvas.height = targetH;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(
+                image.imgElement,
+                p.sourceX,
+                p.sourceY,
+                p.sourceWidth,
+                p.sourceHeight,
+                0,
+                0,
+                targetW,
+                targetH
+              );
+              thumbs.push(canvas.toDataURL('image/jpeg', 0.65));
+            }
+          }
+        }
+      } catch (thumbErr) {
+        // Safe fallback if canvas tainted or unavailable
+      }
+
+      const resLabel = settings.enhanceTo8K || settings.resolutionMode === '8k'
+        ? '8K Ultra-HD'
+        : settings.enhanceTo4K || settings.resolutionMode === '4k'
+        ? '4K Ultra-HD'
+        : 'Native';
+
+      onExportSuccess?.({
+        filename: zipName,
+        count: panelsToZip.length,
+        rows: settings.splitMode === 'grid' ? settings.rows : undefined,
+        columns: settings.splitMode === 'grid' ? settings.columns : undefined,
+        mode: settings.splitMode,
+        resolution: resLabel,
+        thumbnails: thumbs,
+        slices: panelsToZip.slice(0, 9).map((p) => ({
+          index: p.index,
+          name: p.filename,
+          width: p.outputWidth,
+          height: p.outputHeight,
+        })),
+      });
     } catch (e) {
       setIsGenerating(false);
       setProgress((prev) => ({ ...prev, active: false }));
@@ -403,7 +458,7 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
         cancellable: false,
       });
 
-      const zipBase = settings.namingPrefix.trim() || 'split_pro_batch_export';
+      const zipBase = settings.namingPrefix.trim() || 'vistaroai_batch_export';
       const zipName = zipBase.endsWith('.zip') ? zipBase : `${zipBase}.zip`;
 
       await createAndDownloadBatchZip(batchOutputs, zipName, (percent) => {

@@ -23,6 +23,15 @@ declare global {
     };
   }
   interface Window {
+    VistaroAI?: {
+      tools: Record<string, AgentToolDefinition>;
+      list: () => AgentToolMetadata[];
+      call: (name: string, args?: any) => Promise<AgentToolResult>;
+      isPaused: () => boolean;
+      setPaused: (paused: boolean) => void;
+      getLogs: () => ActivityLogItem[];
+      clearLogs: () => void;
+    };
     SplitPro?: {
       tools: Record<string, AgentToolDefinition>;
       list: () => AgentToolMetadata[];
@@ -181,7 +190,7 @@ function triggerHighlight(target: string) {
 export const AGENT_TOOLS: AgentToolMetadata[] = [
   {
     name: 'load_image',
-    description: 'Load an image into Split Pro from clipboard, remote URL, or device file picker.',
+    description: 'Load an image into VistaroAI from clipboard, remote URL, or device file picker.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1445,15 +1454,15 @@ export async function executeAgentTool(name: string, args: any = {}): Promise<Ag
 
 // Generate prompt text for Claude / ChatGPT
 export function generateAgentPrompt(): string {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://splitpro.app';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://vistaroai.app';
   const toolsFormatted = AGENT_TOOLS.map(
     (t) => `- \`${t.name}(${Object.keys(t.inputSchema.properties || {}).join(', ')})\`: ${t.description}`
   ).join('\n');
 
-  return `You are operating Split Pro (Web-based Ultra-HD Image Slicing Application).
+  return `You are operating VistaroAI (Web-based Ultra-HD Image Slicing & Storyboard Video Suite).
 App URL: ${origin}
 
-Split Pro supports programmatic browser control via WebMCP tools and window.SplitPro:
+VistaroAI supports programmatic browser control via WebMCP tools and window.VistaroAI (with window.SplitPro alias):
 
 AVAILABLE TOOLS:
 ${toolsFormatted}
@@ -1504,9 +1513,9 @@ export function initializeWebMcpTools() {
     }
   });
 
-  // Expose on window.SplitPro fallback
+  // Expose on window.VistaroAI (and window.SplitPro fallback)
   if (typeof window !== 'undefined') {
-    window.SplitPro = {
+    const api = {
       tools: toolMap,
       list: () => AGENT_TOOLS,
       call: (name: string, args?: any) => executeAgentTool(name, args),
@@ -1515,5 +1524,7 @@ export function initializeWebMcpTools() {
       getLogs: () => agentState.logs,
       clearLogs: () => clearActivityLogs(),
     };
+    window.VistaroAI = api;
+    window.SplitPro = api;
   }
 }

@@ -1,14 +1,14 @@
-# Split Pro
+# VistaroAI
 
-Professional client-side image and storyboard splitting application built with React, Vite, and Tailwind CSS. All image processing, slicing, upscaling, sharpening, and ZIP packaging occur 100% locally in the browser memory using high-performance HTML5 Canvas APIs.
+Professional client-side image slicing and storyboard video generation suite built with React, Vite, and Tailwind CSS. All image processing, slicing, upscaling, sharpening, video animation, and ZIP packaging occur 100% locally in the browser memory using high-performance HTML5 Canvas and WebCodecs APIs.
 
 ---
 
 ## Agent Access
 
-Split Pro includes an **Agent Access layer** (MCP-style / WebMCP) allowing AI agents (Claude, ChatGPT, browser automation agents) to operate the application through structured tools, while human users retain full manual control and non-destructive undo capability.
+VistaroAI includes an **Agent Access layer** (MCP-style / WebMCP) allowing AI agents (Claude, ChatGPT, browser automation agents) to operate the application through structured tools, while human users retain full manual control and non-destructive undo capability.
 
-When supported by the browser environment, tools are registered directly via `navigator.modelContext.registerTool()`. A global JavaScript fallback is simultaneously exposed at `window.SplitPro`.
+When supported by the browser environment, tools are registered directly via `navigator.modelContext.registerTool()`. A global JavaScript fallback is simultaneously exposed at `window.VistaroAI` (with `window.SplitPro` retained for backwards compatibility).
 
 ### Tool Table
 
@@ -41,36 +41,36 @@ When supported by the browser environment, tools are registered directly via `na
 
 ### Example Call
 
-AI agents can inspect and invoke tools via `window.SplitPro`:
+AI agents can inspect and invoke tools via `window.VistaroAI`:
 
 ```javascript
 // 1. List available tools
-const tools = window.SplitPro.list();
+const tools = window.VistaroAI.list();
 console.log(tools);
 
 // 2. Load an image from URL
-await window.SplitPro.call("load_image", {
+await window.VistaroAI.call("load_image", {
   source: "url",
   url: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=1600&q=80"
 });
 
 // 3. Configure split grid and output
-await window.SplitPro.call("set_grid", { rows: 2, columns: 2 });
-await window.SplitPro.call("set_naming_convention", {
+await window.VistaroAI.call("set_grid", { rows: 2, columns: 2 });
+await window.VistaroAI.call("set_naming_convention", {
   pattern: "{row}-{col}_{timestamp}"
 });
 
 // 4. Configure Video Storyboard
-await window.SplitPro.call("apply_video_preset", { preset: "Instagram Reel" });
-await window.SplitPro.call("set_slide_caption", {
+await window.VistaroAI.call("apply_video_preset", { preset: "Instagram Reel" });
+await window.VistaroAI.call("set_slide_caption", {
   slideIndex: 0,
   text: "Scene 1: Introduction",
   position: "bottom"
 });
-await window.SplitPro.call("preview_video", { action: "play" });
+await window.VistaroAI.call("preview_video", { action: "play" });
 
 // 5. Trigger Video Render (requests user gesture confirmation modal)
-const renderResult = await window.SplitPro.call("render_video");
+const renderResult = await window.VistaroAI.call("render_video");
 console.log(renderResult.state.message);
 ```
 

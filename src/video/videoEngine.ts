@@ -825,7 +825,7 @@ async function renderWithWebCodecs(
 
   return {
     blob,
-    filename: 'splitpro-video.mp4',
+    filename: 'vistaroai-video.mp4',
     format: 'mp4',
     sizeBytes: blob.size,
     durationSec: totalDuration,
@@ -912,7 +912,7 @@ async function renderWithMediaRecorder(
 
   return {
     blob,
-    filename: 'splitpro-video.webm',
+    filename: 'vistaroai-video.webm',
     format: 'webm',
     sizeBytes: blob.size,
     durationSec: totalDuration,
