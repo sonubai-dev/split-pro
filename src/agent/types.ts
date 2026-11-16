@@ -22,7 +22,9 @@ export type ToolName =
   | 'cancel_render'
   | 'undo'
   | 'redo'
-  | 'reset';
+  | 'reset'
+  | 'load_sample'
+  | 'detect_borders';
 
 export interface AgentToolResult<T = any> {
   ok: boolean;

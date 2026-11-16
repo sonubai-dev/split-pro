@@ -299,6 +299,47 @@ server.tool(
   }
 );
 
+// 13. Preview Slices & Sub-Pixel Coordinates
+server.tool(
+  'vistaro_preview_slices',
+  'Inspect all currently calculated slice panels with their sub-pixel coordinates (x, y, width, height) and filenames.',
+  {},
+  async () => {
+    const result = await dispatchToBrowser('preview_slices');
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+// 14. Load Pre-Rendered Vector Sample Artwork
+server.tool(
+  'vistaro_load_sample',
+  'Load a pre-rendered high-resolution vector anime artwork sample into the Vistaro canvas ("cyberpunk" or "panorama").',
+  {
+    sampleType: z.enum(['cyberpunk', 'panorama']).describe('Type of sample artwork to load into canvas'),
+  },
+  async ({ sampleType }) => {
+    const result = await dispatchToBrowser('load_sample', { sampleType });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+// 15. Intelligent Border & Panel Detection
+server.tool(
+  'vistaro_detect_borders',
+  'Run the Web Worker intelligent border detection algorithm on the loaded image to auto-detect comic/manga panel boundaries.',
+  {},
+  async () => {
+    const result = await dispatchToBrowser('detect_borders');
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
 // Connect stdio transport and launch
 async function main() {
   const transport = new StdioServerTransport();

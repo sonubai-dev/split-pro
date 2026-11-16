@@ -9,6 +9,7 @@ import {
 } from './types';
 import { CREATOR_PRESETS } from '../lib/presets';
 import { formatSliceFilename } from '../lib/imageEngine';
+import { getCyberpunkStoryboardSample, getSeamlessPanoramaSample } from '../lib/sampleArtGenerator';
 
 declare global {
   interface Navigator {
@@ -87,6 +88,8 @@ let agentState: AgentAccessState = {
     undo: true,
     redo: true,
     reset: true,
+    load_sample: true,
+    detect_borders: true,
   },
   logs: [],
   pendingExportRequest: null,
@@ -728,6 +731,27 @@ async function executeToolInternal(name: ToolName, args: any = {}): Promise<Agen
         }
 
         return { ok: false, error: 'Unsupported image source.' };
+      }
+
+      case 'load_sample': {
+        const sampleType = args?.sampleType === 'panorama' ? 'panorama' : 'cyberpunk';
+        const sample = sampleType === 'panorama' ? getSeamlessPanoramaSample() : getCyberpunkStoryboardSample();
+        try {
+          await activeBridge.loadImageFromUrl(sample.url);
+          const info = activeBridge.getImageInfo();
+          triggerHighlight('canvas');
+          activeBridge.showToast('Agent: loaded sample artwork', `${sample.name}`, 'success');
+          return {
+            ok: true,
+            state: info,
+            message: `Loaded ${sample.name} into canvas successfully.`,
+          };
+        } catch (err: any) {
+          return {
+            ok: false,
+            error: `Failed to load sample: ${err?.message || 'Error'}`,
+          };
+        }
       }
 
       case 'get_image_info': {
