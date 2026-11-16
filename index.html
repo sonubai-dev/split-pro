@@ -2,21 +2,84 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     <meta name="author" content="VistaroAI" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#080B11" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+
+    <!-- Primary Title & Meta Description -->
     <title>VistaroAI — Precision Image Slicing & Storyboard Video Suite</title>
-    <meta name="description" content="Precision image splitting and storyboard animation application for slicing high-resolution images into grids, seamless carousels, vertical panels, and custom layouts with lossless quality." />
-    <meta property="og:title" content="VistaroAI — Precision Image Slicing & Storyboard Studio" />
-    <meta property="og:description" content="Lossless browser-based image splitter and storyboard motion video generator with custom split dividers, grid presets, and multi-format ZIP/MP4 export." />
+    <meta
+      name="description"
+      content="Lossless browser-based image splitter, Instagram carousel creator, and Ken Burns motion video studio. Slice artwork into 3x3 grids, seamless panoramas, and export 8K PNG or 60 FPS MP4 with 100% in-browser privacy."
+    />
+    <meta
+      name="keywords"
+      content="image splitter, grid slicer, instagram 3x3 grid, seamless swipe carousel, manga storyboard slicer, ken burns motion video, 8k upscaler, client-side video encoder, webcodecs mp4, mcp creative agent"
+    />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://www.vistaroai.online/" />
+
+    <!-- Open Graph / Facebook / Discord -->
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.vistaroai.online/" />
+    <meta property="og:site_name" content="VistaroAI" />
+    <meta property="og:title" content="VistaroAI — Precision Image Slicing & Storyboard Video Suite" />
+    <meta
+      property="og:description"
+      content="Turn multi-panel artwork and carousels into sub-pixel social grids or render smooth Ken Burns motion videos. 100% private in-browser processing with native Model Context Protocol (MCP) agent support."
+    />
+    <meta property="og:image" content="https://www.vistaroai.online/og-image.png" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://www.vistaroai.online/" />
+    <meta name="twitter:title" content="VistaroAI — Precision Image Slicing & Motion Video Studio" />
+    <meta
+      name="twitter:description"
+      content="Split artwork into pixel-perfect social mosaics or render 60 FPS Ken Burns motion videos directly in your browser. 8K lossless definition, zero cloud storage."
+    />
+    <meta name="twitter:image" content="https://www.vistaroai.online/og-image.png" />
+
+    <!-- Font Preconnect & Loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Structured Data (JSON-LD) for SoftwareApplication & CreativeWork -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "VistaroAI",
+        "url": "https://www.vistaroai.online",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "All modern browsers (Chrome, Edge, Firefox, Safari)",
+        "description": "High-resolution in-browser image splitting, storyboard slicing, and hardware-accelerated motion video generation application.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "featureList": [
+          "Sub-pixel mathematical grid slicing (3x3, 3x1, 2x2, custom)",
+          "8K Ultra-HD progressive enhancement and studio sharpening",
+          "Local in-browser WebCodecs MP4 motion video rendering with Ken Burns transitions",
+          "100% Client-Side Privacy Policy: zero cloud uploads",
+          "Model Context Protocol (MCP) native agent bridge for Claude Desktop, Antigravity, and Cursor",
+          "Batch ZIP export, multi-page PDF generation, and WebP compression"
+        ]
+      }
+    </script>
   </head>
-  <body>
+  <body class="antialiased selection:bg-violet-500/20 selection:text-violet-600">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Scissors,
   Moon,
@@ -11,6 +11,13 @@ import {
   Sparkles,
   History,
   Bot,
+  User as UserIcon,
+  LogOut,
+  Menu,
+  X,
+  Home,
+  LayoutDashboard,
+  Film,
 } from 'lucide-react';
 
 interface AppHeaderProps {
@@ -30,6 +37,9 @@ interface AppHeaderProps {
   onGoHome?: () => void;
   currentView?: 'home' | 'dashboard' | 'slicer' | 'video';
   onNavigate?: (view: 'home' | 'dashboard' | 'slicer' | 'video') => void;
+  user?: any;
+  onOpenAuth?: () => void;
+  onSignOut?: () => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -49,7 +59,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onGoHome,
   currentView = 'home',
   onNavigate,
+  user,
+  onOpenAuth,
+  onSignOut,
 }) => {
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-[#0B0F17]/90 backdrop-blur-md text-slate-800 dark:text-[#E5E7EB] select-none transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
@@ -240,8 +255,149 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           >
             {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-600" />}
           </button>
+
+          {/* User Auth Section */}
+          {user ? (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-blue-500/40 transition-all cursor-pointer"
+                title={user.displayName || user.email || 'User Account'}
+              >
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName || 'Avatar'}
+                    className="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-700"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+                    {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </button>
+
+              {isUserMenuOpen && (
+                <div
+                  onClick={() => setIsUserMenuOpen(false)}
+                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#111827] rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 p-2 z-50 text-xs animate-in fade-in slide-in-from-top-1"
+                >
+                  <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+                    <p className="font-semibold text-gray-900 dark:text-white truncate">
+                      {user.displayName || 'Creator'}
+                    </p>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                      {user.email}
+                    </p>
+                  </div>
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onSignOut?.();
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            onOpenAuth && (
+              <button
+                type="button"
+                onClick={onOpenAuth}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+              >
+                <UserIcon className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </button>
+            )
+          )}
+          {/* Mobile Navigation Toggle */}
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle Mobile Menu"
+              className="md:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Mobile Navigation Dropdown */}
+      {isMobileMenuOpen && onNavigate && (
+        <div className="md:hidden border-t border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#0B0F17]/95 backdrop-blur-md px-4 py-3 space-y-1 animate-in fade-in slide-in-from-top-1 shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              onNavigate('home');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              currentView === 'home'
+                ? 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Home className="w-4 h-4" />
+            <span>Home</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onNavigate('dashboard');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              currentView === 'dashboard'
+                ? 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            <span>Dashboard</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onNavigate('slicer');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              currentView === 'slicer'
+                ? 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Scissors className="w-4 h-4" />
+            <span>Storyboard Slicer</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onNavigate('video');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              currentView === 'video'
+                ? 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Film className="w-4 h-4" />
+            <span>Motion Video Studio</span>
+          </button>
+        </div>
+      )}
     </header>
   );
 };

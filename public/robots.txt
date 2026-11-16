@@ -1,0 +1,9 @@
+# Robots.txt for VistaroAI (https://www.vistaroai.online)
+User-agent: *
+Allow: /
+Allow: /slicer
+Allow: /video
+Allow: /dashboard
+
+# Sitemaps
+Sitemap: https://www.vistaroai.online/sitemap.xml

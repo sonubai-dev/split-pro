@@ -41,6 +41,21 @@ declare global {
       getLogs: () => ActivityLogItem[];
       clearLogs: () => void;
     };
+    mcp?: {
+      listTools: () => AgentToolMetadata[];
+      callTool: (name: string, args?: any) => Promise<AgentToolResult>;
+    };
+    chatgptAgent?: {
+      tools: any[];
+      execute: (name: string, args?: any) => Promise<AgentToolResult>;
+      list: () => AgentToolMetadata[];
+    };
+    claudeAgent?: {
+      tools: any[];
+      execute: (name: string, args?: any) => Promise<AgentToolResult>;
+      list: () => AgentToolMetadata[];
+    };
+    __vistaro_agent_listener_attached?: boolean;
   }
 }
 
@@ -1482,12 +1497,77 @@ RECOMMENDED WORKFLOW:
 All image slicing and video rendering runs 100% locally in the browser with high-fidelity canvas processing. Every agent action is logged, visible in the UI, and reversible via undo().`;
 }
 
-// Generate tools JSON representation
+// Generate tools JSON representation (standard WebMCP)
 export function generateToolsJson(): string {
   return JSON.stringify(AGENT_TOOLS, null, 2);
 }
 
-// Initialize WebMCP and window.SplitPro
+// Generate ChatGPT Function Calling / Custom GPT Actions JSON schema
+export function generateChatGPTToolsJson(): string {
+  const tools = AGENT_TOOLS.map((tool) => ({
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: {
+        type: 'object',
+        properties: tool.inputSchema?.properties || {},
+        required: tool.inputSchema?.required || [],
+      },
+    },
+  }));
+  return JSON.stringify(tools, null, 2);
+}
+
+// Generate Anthropic Claude Tool Use JSON schema
+export function generateClaudeToolsJson(): string {
+  const tools = AGENT_TOOLS.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    input_schema: {
+      type: 'object',
+      properties: tool.inputSchema?.properties || {},
+      required: tool.inputSchema?.required || [],
+    },
+  }));
+  return JSON.stringify(tools, null, 2);
+}
+
+// Generate copyable browser console / Playwright / Puppeteer script snippet
+export function generateExternalAgentScript(): string {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  return `/**
+ * VistaroAI External Agent Bridge (ChatGPT / Claude / Playwright)
+ * Connects directly to window.VistaroAI / window.SplitPro / window.mcp
+ */
+(async () => {
+  console.log("🚀 Connected to VistaroAI Agent Bridge at ${origin}");
+  
+  // 1. Inspect registered tools
+  const tools = window.VistaroAI.list();
+  console.log(\`✅ Registered \${tools.length} local canvas tools\`);
+
+  // 2. Load demo image or canvas
+  await window.VistaroAI.call("load_image", {
+    source: "url",
+    url: "https://www.vistaroai.online/sample_anime_storyboard.png"
+  });
+
+  // 3. Configure 3x3 Instagram Mosaic Grid & 8K Ultra-HD Output
+  await window.VistaroAI.call("set_grid", { rows: 3, columns: 3 });
+  await window.VistaroAI.call("set_output", { 
+    resolution: "8k", 
+    format: "png", 
+    sharpness: "studio8k" 
+  });
+  
+  // 4. Calculate coordinates & preview
+  const preview = await window.VistaroAI.call("preview_slices");
+  console.log("📐 Slices ready:", preview);
+})();`;
+}
+
+// Initialize WebMCP, window.VistaroAI, and external agent bridges
 export function initializeWebMcpTools() {
   const toolMap: Record<string, AgentToolDefinition> = {};
 
@@ -1513,7 +1593,7 @@ export function initializeWebMcpTools() {
     }
   });
 
-  // Expose on window.VistaroAI (and window.SplitPro fallback)
+  // Expose on window globals for external agents (ChatGPT, Claude, Puppeteer, Extensions)
   if (typeof window !== 'undefined') {
     const api = {
       tools: toolMap,
@@ -1526,5 +1606,164 @@ export function initializeWebMcpTools() {
     };
     window.VistaroAI = api;
     window.SplitPro = api;
+
+    // Standard Model Context Protocol (MCP) browser shim
+    window.mcp = {
+      listTools: () => AGENT_TOOLS,
+      callTool: (name: string, args?: any) => executeAgentTool(name, args),
+    };
+
+    // Dedicated shims for ChatGPT and Claude extensions / browser scripts
+    window.chatgptAgent = {
+      tools: AGENT_TOOLS.map((t) => ({
+        type: 'function',
+        function: { name: t.name, description: t.description, parameters: t.inputSchema },
+      })),
+      execute: (name: string, args?: any) => executeAgentTool(name, args),
+      list: () => AGENT_TOOLS,
+    };
+
+    window.claudeAgent = {
+      tools: AGENT_TOOLS.map((t) => ({
+        name: t.name,
+        description: t.description,
+        input_schema: t.inputSchema,
+      })),
+      execute: (name: string, args?: any) => executeAgentTool(name, args),
+      list: () => AGENT_TOOLS,
+    };
+
+    // Attach bi-directional window postMessage listener for cross-context automation
+    if (!window.__vistaro_agent_listener_attached) {
+      window.__vistaro_agent_listener_attached = true;
+
+      window.addEventListener('message', async (event: MessageEvent) => {
+        const data = event.data;
+        if (!data || typeof data !== 'object') return;
+
+        // Support:
+        // 1. { type: 'VISTARO_AGENT_CALL', id, tool, args }
+        // 2. { action: 'vistaro_agent_call', tool, args, id }
+        // 3. JSON-RPC format: { jsonrpc: '2.0', id, method, params }
+        if (
+          data.type === 'VISTARO_AGENT_CALL' ||
+          data.action === 'vistaro_agent_call' ||
+          data.jsonrpc === '2.0'
+        ) {
+          const toolName = data.tool || data.name || data.method;
+          const args = data.args || data.params || {};
+          const reqId = data.id || `msg-${Date.now()}`;
+
+          if (!toolName) return;
+
+          try {
+            const result = await executeAgentTool(toolName, args);
+            const responsePayload = {
+              type: 'VISTARO_AGENT_RESPONSE',
+              jsonrpc: data.jsonrpc ? '2.0' : undefined,
+              id: reqId,
+              tool: toolName,
+              ok: result.ok,
+              result: result.result || result.state,
+              message: result.message,
+              error: result.error,
+            };
+
+            if (event.source && typeof (event.source as any).postMessage === 'function') {
+              (event.source as any).postMessage(responsePayload, '*');
+            } else {
+              window.postMessage(responsePayload, '*');
+            }
+
+            window.dispatchEvent(
+              new CustomEvent('vistaro-agent-response', { detail: responsePayload })
+            );
+          } catch (err: any) {
+            const errPayload = {
+              type: 'VISTARO_AGENT_RESPONSE',
+              id: reqId,
+              tool: toolName,
+              ok: false,
+              error: err?.message || String(err),
+            };
+            window.postMessage(errPayload, '*');
+          }
+        } else if (data.type === 'VISTARO_AGENT_LIST_TOOLS' || data.action === 'list_tools') {
+          const listPayload = {
+            type: 'VISTARO_AGENT_TOOLS_LIST',
+            id: data.id,
+            tools: AGENT_TOOLS,
+            isPaused: agentState.isPaused,
+          };
+          if (event.source && typeof (event.source as any).postMessage === 'function') {
+            (event.source as any).postMessage(listPayload, '*');
+          } else {
+            window.postMessage(listPayload, '*');
+          }
+        }
+      });
+
+      // Custom DOM Event bridge:
+      // window.dispatchEvent(new CustomEvent('vistaro-agent-call', { detail: { tool: 'set_grid', args: { rows: 2, columns: 2 } } }))
+      window.addEventListener('vistaro-agent-call', async (e: any) => {
+        const detail = e.detail;
+        if (!detail || !detail.tool) return;
+        const result = await executeAgentTool(detail.tool, detail.args || {});
+        window.dispatchEvent(
+          new CustomEvent('vistaro-agent-result', {
+            detail: { id: detail.id, tool: detail.tool, ...result },
+          })
+        );
+      });
+
+      // WebSocket Bridge connection to local Vistaro MCP Server (port 3001)
+      let mcpWs: WebSocket | null = null;
+      let reconnectTimer: any = null;
+
+      const initMcpWebSocket = () => {
+        if (typeof window === 'undefined' || !window.WebSocket) return;
+        try {
+          mcpWs = new WebSocket('ws://localhost:3001');
+
+          mcpWs.onopen = () => {
+            console.log('[Vistaro MCP Bridge] Connected to MCP WebSocket server on ws://localhost:3001');
+          };
+
+          mcpWs.onmessage = async (event: MessageEvent) => {
+            try {
+              const msg = JSON.parse(event.data);
+              if (msg.type === 'VISTARO_MCP_CALL' && msg.requestId && msg.tool) {
+                const res = await executeAgentTool(msg.tool, msg.args || {});
+                if (mcpWs && mcpWs.readyState === WebSocket.OPEN) {
+                  mcpWs.send(
+                    JSON.stringify({
+                      type: 'VISTARO_MCP_RESULT',
+                      requestId: msg.requestId,
+                      result: res,
+                    })
+                  );
+                }
+              }
+            } catch (err) {
+              console.warn('[Vistaro MCP Bridge] Error processing MCP message:', err);
+            }
+          };
+
+          mcpWs.onclose = () => {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(initMcpWebSocket, 5000);
+          };
+
+          mcpWs.onerror = () => {
+            mcpWs?.close();
+          };
+        } catch {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(initMcpWebSocket, 10000);
+        }
+      };
+
+      initMcpWebSocket();
+    }
   }
 }

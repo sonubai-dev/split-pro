@@ -1,0 +1,211 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Application: VistaroAI (Precision Image Slicing & Storyboard Video Web Suite)
+// Project ID: vistaro-9c660
+//
+// Collection: users/{userId}
+// Document ID: Firebase Auth UID ({userId})
+// Fields:
+//   - uid: string (required, 1-128 chars, immutable) - Must match authenticated UID and path
+//   - email: string (optional, nullable, max 254 chars) - User's email address
+//   - displayName: string (optional, nullable, max 100 chars) - Profile display name
+//   - photoURL: string (optional, nullable, max 1000 chars) - Profile avatar URL (http/https)
+//   - lastLoginAt: timestamp (optional, nullable) - Server timestamp of last login
+//   - createdAt: timestamp (optional, nullable, immutable on update) - Account registration timestamp
+//
+// Subcollection: users/{userId}/presets/{presetId}
+// Document ID: Unique preset ID
+// Fields:
+//   - name: string (required, 1-100 chars) - Preset label/title
+//   - rows: int (required, 1-50) - Number of slice rows
+//   - columns: int (required, 1-50) - Number of slice columns
+//   - resolution: string (required, enum: '8k' | '4k' | '2k' | 'original' | 'custom') - Target export resolution
+//   - format: string (required, enum: 'png' | 'jpeg' | 'webp') - Image export format
+//   - sharpness: string (required, enum: 'off' | 'subtle' | 'crisp' | 'ultra' | 'studio8k') - Sharpness level
+//   - createdAt: timestamp (required, immutable on update) - Preset creation timestamp
+//   - updatedAt: timestamp (required) - Preset last modified timestamp
+//
+// Subcollection: users/{userId}/exports/{exportId}
+// Document ID: Unique export history ID
+// Fields:
+//   - sliceCount: int (required, 1-500) - Total number of slices produced
+//   - filename: string (required, 1-255 chars) - Name of exported archive or file
+//   - timestamp: timestamp (required, immutable on update) - Export generation timestamp
+//
+// Default Deny:
+//   - All other root collections, subcollections, or documents are strictly denied.
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the user is authenticated with Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if user owns the document/subcollection based on path userId
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validate URL format (must begin with http:// or https://)
+    function isValidUrl(url) {
+      return url is string &&
+        (url.matches('^https://.*') || url.matches('^http://.*'));
+    }
+
+    // Validate RFC-compliant email address format
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    // Validate optional email field for users document
+    function isValidOptionalEmail(data) {
+      return !('email' in data) ||
+             data.email == null ||
+             (data.email is string &&
+              data.email.size() <= 254 &&
+              (data.email.size() == 0 || isValidEmail(data.email)));
+    }
+
+    // Validate optional displayName field for users document
+    function isValidOptionalDisplayName(data) {
+      return !('displayName' in data) ||
+             data.displayName == null ||
+             (data.displayName is string && data.displayName.size() <= 100);
+    }
+
+    // Validate optional photoURL field for users document
+    function isValidOptionalPhotoUrl(data) {
+      return !('photoURL' in data) ||
+             data.photoURL == null ||
+             (data.photoURL is string &&
+              data.photoURL.size() <= 1000 &&
+              (data.photoURL.size() == 0 || isValidUrl(data.photoURL)));
+    }
+
+    // Validate optional timestamp field
+    function isValidOptionalTimestamp(data, field) {
+      return !(field in data) || data[field] == null || data[field] is timestamp;
+    }
+
+    // ===============================================================
+    // Domain Validators (Applied to both create and update operations)
+    // ===============================================================
+
+    // Validate user profile metadata schema
+    function isValidUser(data, userId) {
+      return data.keys().hasAll(['uid']) &&
+             data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'lastLoginAt', 'createdAt']) &&
+             data.uid is string &&
+             data.uid == userId &&
+             data.uid == request.auth.uid &&
+             data.uid.size() >= 1 &&
+             data.uid.size() <= 128 &&
+             isValidOptionalEmail(data) &&
+             isValidOptionalDisplayName(data) &&
+             isValidOptionalPhotoUrl(data) &&
+             isValidOptionalTimestamp(data, 'lastLoginAt') &&
+             isValidOptionalTimestamp(data, 'createdAt');
+    }
+
+    // Validate user profile update invariants
+    function isUserUpdateValid() {
+      return request.resource.data.uid == resource.data.uid &&
+             (!('createdAt' in resource.data) ||
+              ('createdAt' in request.resource.data &&
+               request.resource.data.createdAt == resource.data.createdAt));
+    }
+
+    // Validate custom preset document schema
+    function isValidPreset(data) {
+      return data.keys().hasAll(['name', 'rows', 'columns', 'resolution', 'format', 'sharpness', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly(['name', 'rows', 'columns', 'resolution', 'format', 'sharpness', 'createdAt', 'updatedAt']) &&
+             data.name is string &&
+             data.name.size() >= 1 &&
+             data.name.size() <= 100 &&
+             data.rows is int &&
+             data.rows >= 1 &&
+             data.rows <= 50 &&
+             data.columns is int &&
+             data.columns >= 1 &&
+             data.columns <= 50 &&
+             data.resolution is string &&
+             data.resolution in ['8k', '4k', '2k', 'original', 'custom'] &&
+             data.format is string &&
+             data.format in ['png', 'jpeg', 'webp'] &&
+             data.sharpness is string &&
+             data.sharpness in ['off', 'subtle', 'crisp', 'ultra', 'studio8k'] &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    // Validate preset update invariants
+    function isPresetUpdateValid() {
+      return request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    // Validate export history metadata schema
+    function isValidExport(data) {
+      return data.keys().hasAll(['sliceCount', 'filename', 'timestamp']) &&
+             data.keys().hasOnly(['sliceCount', 'filename', 'timestamp']) &&
+             data.sliceCount is int &&
+             data.sliceCount >= 1 &&
+             data.sliceCount <= 500 &&
+             data.filename is string &&
+             data.filename.size() >= 1 &&
+             data.filename.size() <= 255 &&
+             data.timestamp is timestamp;
+    }
+
+    // Validate export history update invariants
+    function isExportUpdateValid() {
+      return request.resource.data.timestamp == resource.data.timestamp;
+    }
+
+    // ===============================================================
+    // Security Access Rules
+    // ===============================================================
+
+    // Root catch-all: Default deny everything not explicitly permitted
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users Collection & User-Scoped Subcollections
+    match /users/{userId} {
+      // User Profile: Only owner can read, create, update, or delete their profile
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data, userId);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data, userId) && isUserUpdateValid();
+      allow delete: if isOwner(userId);
+
+      // Presets Subcollection: User-saved slicing & export configurations
+      match /presets/{presetId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidPreset(request.resource.data);
+        allow update: if isOwner(userId) && isValidPreset(request.resource.data) && isPresetUpdateValid();
+        allow delete: if isOwner(userId);
+      }
+
+      // Exports Subcollection: Lightweight export history log
+      match /exports/{exportId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidExport(request.resource.data);
+        allow update: if isOwner(userId) && isValidExport(request.resource.data) && isExportUpdateValid();
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

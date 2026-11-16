@@ -12,6 +12,8 @@ import { ToastContainer } from './components/ToastContainer';
 import { RecentExportsDrawer } from './components/RecentExportsDrawer';
 import { AgentDrawer } from './components/AgentDrawer';
 import { AgentExportModal } from './components/AgentExportModal';
+import { AuthModal } from './components/AuthModal';
+import { useAuth } from './hooks/useAuth';
 import { useImageLoader } from './hooks/useImageLoader';
 import { useEditorHistory, DEFAULT_SETTINGS } from './hooks/useEditorHistory';
 import { useToast } from './hooks/useToast';
@@ -29,10 +31,10 @@ import {
 import { PendingExportRequest } from './agent/types';
 
 export default function App() {
-  // Theme management with localStorage persistence
+  // Theme management with localStorage persistence (defaults to light mode)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('precision_split_theme');
-    return saved === 'light' ? 'light' : 'dark';
+    return saved === 'dark' ? 'dark' : 'light';
   });
 
   // Keep dark class synced on <html>
@@ -50,6 +52,17 @@ export default function App() {
 
   // Toast system
   const { toasts, addToast, removeToast } = useToast();
+
+  // Auth state & Firebase integration
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const {
+    user,
+    signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
+    resetPassword: authResetPassword,
+    logOut,
+  } = useAuth();
 
   // Modal states
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
@@ -494,6 +507,9 @@ export default function App() {
         onGoHome={() => setCurrentView('home')}
         currentView={currentView}
         onNavigate={(v) => setCurrentView(v)}
+        user={user}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onSignOut={logOut}
       />
 
       {/* Main Content View Routing */}
@@ -511,8 +527,8 @@ export default function App() {
               loadImagesFromFiles(files);
               setCurrentView('slicer');
             }}
-            onSampleSelected={(url) => {
-              loadImageFromUrl(url, 'sample_image.jpg');
+            onSampleSelected={(url, name) => {
+              loadImageFromUrl(url, name || 'sample_image.jpg');
               setCurrentView('slicer');
             }}
             onNavigate={(v) => setCurrentView(v)}
@@ -635,6 +651,17 @@ export default function App() {
       <KeyboardShortcutsModal
         isOpen={isShortcutsOpen}
         onClose={() => setIsShortcutsOpen(false)}
+      />
+
+      {/* Firebase Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onSignInGoogle={signInWithGoogle}
+        onSignInEmail={signInWithEmail}
+        onSignUpEmail={signUpWithEmail}
+        onResetPassword={authResetPassword}
+        onToast={addToast}
       />
 
       {/* Toast Notifications */}
