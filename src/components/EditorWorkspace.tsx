@@ -216,16 +216,37 @@ export const EditorWorkspace: React.FC<EditorWorkspaceProps> = ({
     }
   }, [image, currentSlices, settings, generatedPanels, setProgress, onToast]);
 
-  // Cleanup blob URLs on unmount
+  // Persistent tracking of active blob URLs so renames/reorders do not prematurely revoke thumbnails
+  const activeBlobUrlsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const currentUrls = new Set(
+      generatedPanels
+        .map((p) => p.blobUrl)
+        .filter((u): u is string => Boolean(u && u.startsWith('blob:')))
+    );
+
+    // Only revoke URLs that were discarded from the panel set
+    activeBlobUrlsRef.current.forEach((url) => {
+      if (!currentUrls.has(url)) {
+        URL.revokeObjectURL(url);
+        activeBlobUrlsRef.current.delete(url);
+      }
+    });
+
+    // Track active URLs
+    currentUrls.forEach((url) => activeBlobUrlsRef.current.add(url));
+  }, [generatedPanels]);
+
+  // Revoke all remaining active URLs on component unmount only
   useEffect(() => {
     return () => {
-      generatedPanels.forEach((p) => {
-        if (p.blobUrl && p.blobUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(p.blobUrl);
-        }
+      activeBlobUrlsRef.current.forEach((url) => {
+        URL.revokeObjectURL(url);
       });
+      activeBlobUrlsRef.current.clear();
     };
-  }, [generatedPanels]);
+  }, []);
 
   // Single panel download
   const handleDownloadSingle = useCallback(

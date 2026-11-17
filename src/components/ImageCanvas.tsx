@@ -57,6 +57,15 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
     index: number;
   } | null>(null);
 
+  // Buffered line drag position to prevent thrashing root state on every RAF frame
+  const [dragOverride, setDragOverride] = useState<{
+    orientation: 'vertical' | 'horizontal';
+    index: number;
+    pos: number;
+  } | null>(null);
+  const dragOverrideRef = useRef<typeof dragOverride>(null);
+  dragOverrideRef.current = dragOverride;
+
   // RAF ref for high performance throttling
   const rafRef = useRef<number | null>(null);
 
@@ -203,10 +212,10 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
             }
           }
 
-          onUpdateSettings((prev) => {
-            const nextV = [...prev.customVLines];
-            nextV[draggingLine.index] = sourceX;
-            return { ...prev, customVLines: nextV };
+          setDragOverride({
+            orientation: 'vertical',
+            index: draggingLine.index,
+            pos: sourceX,
           });
         } else {
           const mouseY = clientY - rect.top;
@@ -232,14 +241,32 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
             }
           }
 
-          onUpdateSettings((prev) => {
-            const nextH = [...prev.customHLines];
-            nextH[draggingLine.index] = sourceY;
-            return { ...prev, customHLines: nextH };
+          setDragOverride({
+            orientation: 'horizontal',
+            index: draggingLine.index,
+            pos: sourceY,
           });
         }
       }
     });
+  };
+
+  const commitDragOverride = () => {
+    if (dragOverrideRef.current) {
+      const { orientation, index, pos } = dragOverrideRef.current;
+      onUpdateSettings((prev) => {
+        if (orientation === 'vertical') {
+          const next = [...prev.customVLines];
+          next[index] = pos;
+          return { ...prev, customVLines: next.sort((a, b) => a - b) };
+        } else {
+          const next = [...prev.customHLines];
+          next[index] = pos;
+          return { ...prev, customHLines: next.sort((a, b) => a - b) };
+        }
+      });
+      setDragOverride(null);
+    }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -257,6 +284,7 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
   };
 
   const handleTouchEnd = () => {
+    commitDragOverride();
     setIsPanning(false);
     setDraggingLine(null);
     touchStartDistRef.current = null;
@@ -271,6 +299,7 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
     }
+    commitDragOverride();
     setIsPanning(false);
     setDraggingLine(null);
   };
@@ -510,8 +539,9 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
       <div
         id="canvas-transform-wrapper"
         style={{
-          transform: `translate(${pan.x}px, ${pan.y}px)`,
-          transition: isPanning || draggingLine ? 'none' : 'transform 0.05s ease-out',
+          transform: `translate3d(${pan.x}px, ${pan.y}px, 0)`,
+          transition: isPanning || draggingLine ? 'none' : 'transform 0.08s cubic-bezier(0.2, 0, 0, 1)',
+          willChange: 'transform',
         }}
         className="relative flex items-center justify-center"
       >
@@ -520,6 +550,8 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
           style={{
             width: image.width * zoom,
             height: image.height * zoom,
+            contain: 'layout paint size',
+            touchAction: 'none',
           }}
           className="relative shadow-2xl rounded-sm overflow-hidden select-none border border-[#1F2937]"
         >
@@ -613,7 +645,11 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
             <div className="absolute inset-0 pointer-events-none">
               {/* Vertical Lines */}
               {settings.customVLines.map((vPos, idx) => {
-                const screenX = vPos * zoom;
+                const currentV =
+                  dragOverride?.orientation === 'vertical' && dragOverride.index === idx
+                    ? dragOverride.pos
+                    : vPos;
+                const screenX = currentV * zoom;
                 const isHovered =
                   hoveredLine?.orientation === 'vertical' && hoveredLine.index === idx;
                 const isDragging =
@@ -623,7 +659,7 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                   <div
                     key={`v_${idx}`}
                     style={{ left: `${screenX}px` }}
-                    className="absolute top-0 bottom-0 pointer-events-auto group cursor-col-resize z-30 w-10 -ml-5 flex justify-center"
+                    className="absolute top-0 bottom-0 pointer-events-auto group cursor-col-resize z-30 w-12 -ml-6 flex justify-center touch-none"
                     onMouseEnter={() => setHoveredLine({ orientation: 'vertical', index: idx })}
                     onMouseLeave={() => setHoveredLine(null)}
                     onMouseDown={(e) => {
@@ -656,7 +692,7 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                         <Move className="w-4 h-4 rotate-90" />
                       </div>
                       <div className="hidden sm:block px-1.5 py-0.5 rounded bg-[#111827]/90 text-amber-300 font-mono text-[9px] border border-[#374151] shadow-md whitespace-nowrap">
-                        X: {Math.round(vPos)}px ({Math.round((vPos / image.width) * 100)}%)
+                        X: {Math.round(currentV)}px ({Math.round((currentV / image.width) * 100)}%)
                       </div>
                       <button
                         type="button"
@@ -681,7 +717,11 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
 
               {/* Horizontal Lines */}
               {settings.customHLines.map((hPos, idx) => {
-                const screenY = hPos * zoom;
+                const currentH =
+                  dragOverride?.orientation === 'horizontal' && dragOverride.index === idx
+                    ? dragOverride.pos
+                    : hPos;
+                const screenY = currentH * zoom;
                 const isHovered =
                   hoveredLine?.orientation === 'horizontal' && hoveredLine.index === idx;
                 const isDragging =
@@ -691,7 +731,7 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                   <div
                     key={`h_${idx}`}
                     style={{ top: `${screenY}px` }}
-                    className="absolute left-0 right-0 pointer-events-auto group cursor-row-resize z-30 h-10 -mt-5 flex flex-col justify-center"
+                    className="absolute left-0 right-0 pointer-events-auto group cursor-row-resize z-30 h-12 -mt-6 flex flex-col justify-center touch-none"
                     onMouseEnter={() => setHoveredLine({ orientation: 'horizontal', index: idx })}
                     onMouseLeave={() => setHoveredLine(null)}
                     onMouseDown={(e) => {
@@ -724,7 +764,7 @@ export const ImageCanvas: React.FC<ImageCanvasProps> = ({
                         <Move className="w-4 h-4" />
                       </div>
                       <div className="hidden sm:block px-1.5 py-0.5 rounded bg-[#111827]/90 text-amber-300 font-mono text-[9px] border border-[#374151] shadow-md whitespace-nowrap">
-                        Y: {Math.round(hPos)}px ({Math.round((hPos / image.height) * 100)}%)
+                        Y: {Math.round(currentH)}px ({Math.round((currentH / image.height) * 100)}%)
                       </div>
                       <button
                         type="button"

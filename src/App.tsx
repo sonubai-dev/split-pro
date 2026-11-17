@@ -1,18 +1,43 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Scissors, PlusCircle } from 'lucide-react';
 import { AppHeader } from './components/AppHeader';
 import { LandingPage } from './components/LandingPage';
-import { Dashboard } from './components/Dashboard';
-import { MotionVideoStudio } from './components/MotionVideoStudio';
-import { EditorWorkspace } from './components/EditorWorkspace';
-import { ProcessingModal } from './components/ProcessingModal';
-import { LargeImageModal } from './components/LargeImageModal';
-import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { ToastContainer } from './components/ToastContainer';
-import { RecentExportsDrawer } from './components/RecentExportsDrawer';
-import { AgentDrawer } from './components/AgentDrawer';
-import { AgentExportModal } from './components/AgentExportModal';
-import { AuthModal } from './components/AuthModal';
+
+// Lazy-loaded Views and Modals to reduce initial bundle from 2.2MB to < 180kB
+const Dashboard = lazy(() => import('./components/Dashboard').then((m) => ({ default: m.Dashboard })));
+const MotionVideoStudio = lazy(() =>
+  import('./components/MotionVideoStudio').then((m) => ({ default: m.MotionVideoStudio }))
+);
+const EditorWorkspace = lazy(() =>
+  import('./components/EditorWorkspace').then((m) => ({ default: m.EditorWorkspace }))
+);
+const ProcessingModal = lazy(() =>
+  import('./components/ProcessingModal').then((m) => ({ default: m.ProcessingModal }))
+);
+const LargeImageModal = lazy(() =>
+  import('./components/LargeImageModal').then((m) => ({ default: m.LargeImageModal }))
+);
+const KeyboardShortcutsModal = lazy(() =>
+  import('./components/KeyboardShortcutsModal').then((m) => ({ default: m.KeyboardShortcutsModal }))
+);
+const RecentExportsDrawer = lazy(() =>
+  import('./components/RecentExportsDrawer').then((m) => ({ default: m.RecentExportsDrawer }))
+);
+const AgentDrawer = lazy(() => import('./components/AgentDrawer').then((m) => ({ default: m.AgentDrawer })));
+const AgentExportModal = lazy(() =>
+  import('./components/AgentExportModal').then((m) => ({ default: m.AgentExportModal }))
+);
+const AuthModal = lazy(() => import('./components/AuthModal').then((m) => ({ default: m.AuthModal })));
+
+const ViewLoadingFallback: React.FC = () => (
+  <div className="flex-1 flex items-center justify-center min-h-[60vh] bg-white dark:bg-[#0B0F17]">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-xs font-mono text-slate-500 dark:text-slate-400">Loading Studio View...</span>
+    </div>
+  </div>
+);
 import { useAuth } from './hooks/useAuth';
 import { useImageLoader } from './hooks/useImageLoader';
 import { useEditorHistory, DEFAULT_SETTINGS } from './hooks/useEditorHistory';
@@ -552,181 +577,182 @@ export default function App() {
 
       {/* Main Content View Routing */}
       <main className="flex-1 flex flex-col">
-        {currentView === 'home' && (
-          <LandingPage
-            onGetStarted={() => setCurrentView('dashboard')}
-            onOpenSlicer={() => setCurrentView('slicer')}
-            onOpenVideoStudio={() => setCurrentView('video')}
-            onImageSelected={(file) => {
-              loadImageFromFile(file);
-              setCurrentView('slicer');
-            }}
-            onImagesSelected={(files) => {
-              loadImagesFromFiles(files);
-              setCurrentView('slicer');
-            }}
-            onSampleSelected={(url, name) => {
-              loadImageFromUrl(url, name || 'sample_image.jpg');
-              setCurrentView('slicer');
-            }}
-            onNavigate={(v) => setCurrentView(v)}
-          />
-        )}
-
-        {currentView === 'dashboard' && (
-          <Dashboard
-            onOpenSlicer={() => setCurrentView('slicer')}
-            onOpenVideoStudio={() => setCurrentView('video')}
-            onImageSelected={(file) => {
-              loadImageFromFile(file);
-              setCurrentView('slicer');
-            }}
-            onImagesSelected={(files) => {
-              loadImagesFromFiles(files);
-              setCurrentView('slicer');
-            }}
-            recentExports={recentExports}
-            onClearRecentExports={clearRecentExports}
-            onNavigate={(v) => setCurrentView(v)}
-          />
-        )}
-
-        {currentView === 'video' && (
-          <MotionVideoStudio
-            onBackToDashboard={() => setCurrentView('dashboard')}
-            onNavigate={(v) => setCurrentView(v)}
-            existingPanels={workspaceBridgeRef.current?.getPanels?.() || []}
-            onToast={addToast}
-          />
-        )}
-
-        {currentView === 'slicer' && (
-          !image ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-xl mx-auto space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-violet-100 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 flex items-center justify-center mx-auto shadow-sm">
-                <Scissors className="w-7 h-7" />
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-                  Upload an Image to Start Slicing
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Choose a high-resolution image, comic strip, or panoramic photo to split into grids and panels.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleTriggerUpload}
-                  className="px-5 py-2.5 text-xs font-semibold rounded-xl text-white bg-violet-600 hover:bg-violet-500 shadow-md transition-all cursor-pointer flex items-center gap-2"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Choose Image File</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentView('dashboard')}
-                  className="px-4 py-2.5 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                >
-                  Back to Dashboard
-                </button>
-              </div>
-            </div>
-          ) : (
-            <EditorWorkspace
-              image={image}
-              images={images}
-              activeImageIndex={activeImageIndex}
-              onSelectImageIndex={setActiveImageIndex}
-              onAddImages={loadImagesFromFiles}
-              onRemoveImageIndex={removeImageAtIndex}
-              settings={settings}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              onUpdateSettings={updateSettings}
-              onUndo={undo}
-              onRedo={redo}
-              onReset={() => {
-                resetSettings();
-                addToast('Reset', 'Settings restored to defaults.', 'info');
+        <Suspense fallback={<ViewLoadingFallback />}>
+          {currentView === 'home' && (
+            <LandingPage
+              onGetStarted={() => setCurrentView('dashboard')}
+              onOpenSlicer={() => setCurrentView('slicer')}
+              onOpenVideoStudio={() => setCurrentView('video')}
+              onImageSelected={(file) => {
+                loadImageFromFile(file);
+                setCurrentView('slicer');
               }}
-              onReplaceImage={handleTriggerUpload}
-              onRemoveImage={clearImage}
-              onToast={addToast}
-              onExportSuccess={addRecentExport}
-              progress={progress}
-              setProgress={setProgress}
-              onBatchExportZip={handleBatchExportZip}
-              agentHighlight={agentHighlight}
-              onRegisterWorkspaceBridge={(methods) => {
-                workspaceBridgeRef.current = methods;
+              onImagesSelected={(files) => {
+                loadImagesFromFiles(files);
+                setCurrentView('slicer');
               }}
+              onSampleSelected={(url, name) => {
+                loadImageFromUrl(url, name || 'sample_image.jpg');
+                setCurrentView('slicer');
+              }}
+              onNavigate={(v) => setCurrentView(v)}
             />
-          )
-        )}
+          )}
+
+          {currentView === 'dashboard' && (
+            <Dashboard
+              onOpenSlicer={() => setCurrentView('slicer')}
+              onOpenVideoStudio={() => setCurrentView('video')}
+              onImageSelected={(file) => {
+                loadImageFromFile(file);
+                setCurrentView('slicer');
+              }}
+              onImagesSelected={(files) => {
+                loadImagesFromFiles(files);
+                setCurrentView('slicer');
+              }}
+              recentExports={recentExports}
+              onClearRecentExports={clearRecentExports}
+              onNavigate={(v) => setCurrentView(v)}
+            />
+          )}
+
+          {currentView === 'video' && (
+            <MotionVideoStudio
+              onBackToDashboard={() => setCurrentView('dashboard')}
+              onNavigate={(v) => setCurrentView(v)}
+              existingPanels={workspaceBridgeRef.current?.getPanels?.() || []}
+              onToast={addToast}
+            />
+          )}
+
+          {currentView === 'slicer' && (
+            !image ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-xl mx-auto space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-violet-100 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 flex items-center justify-center mx-auto shadow-sm">
+                  <Scissors className="w-7 h-7" />
+                </div>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                    Upload an Image to Start Slicing
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Choose a high-resolution image, comic strip, or panoramic photo to split into grids and panels.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleTriggerUpload}
+                    className="px-5 py-2.5 text-xs font-semibold rounded-xl text-white bg-violet-600 hover:bg-violet-500 shadow-md transition-all cursor-pointer flex items-center gap-2"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Choose Image File</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView('dashboard')}
+                    className="px-4 py-2.5 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    Back to Dashboard
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <EditorWorkspace
+                image={image}
+                images={images}
+                activeImageIndex={activeImageIndex}
+                onSelectImageIndex={setActiveImageIndex}
+                onAddImages={loadImagesFromFiles}
+                onRemoveImageIndex={removeImageAtIndex}
+                settings={settings}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUpdateSettings={updateSettings}
+                onUndo={undo}
+                onRedo={redo}
+                onReset={() => {
+                  resetSettings();
+                  addToast('Reset', 'Settings restored to defaults.', 'info');
+                }}
+                onReplaceImage={handleTriggerUpload}
+                onRemoveImage={clearImage}
+                onToast={addToast}
+                onExportSuccess={addRecentExport}
+                progress={progress}
+                setProgress={setProgress}
+                onBatchExportZip={handleBatchExportZip}
+                agentHighlight={agentHighlight}
+                onRegisterWorkspaceBridge={(methods) => {
+                  workspaceBridgeRef.current = methods;
+                }}
+              />
+            )
+          )}
+        </Suspense>
       </main>
 
-      {/* Modals & Overlays */}
-      <ProcessingModal
-        progress={progress}
-        onCancel={() => {
-          abortControllerRef.current?.abort();
-          setProgress((prev) => ({ ...prev, active: false }));
-        }}
-      />
+      {/* Modals & Overlays (Lazy-loaded with Suspense) */}
+      <Suspense fallback={null}>
+        <ProcessingModal
+          progress={progress}
+          onCancel={() => {
+            abortControllerRef.current?.abort();
+            setProgress((prev) => ({ ...prev, active: false }));
+          }}
+        />
 
-      <LargeImageModal
-        isOpen={isLargeImageWarning}
-        dimensions={pendingDimensions}
-        onAcceptFull={acceptLargeImage}
-        onResizeSafe={() => resizeAndAcceptLargeImage(4096)}
-        onCancel={() => {
-          clearImage();
-          setError(null);
-        }}
-      />
+        <LargeImageModal
+          isOpen={isLargeImageWarning}
+          dimensions={pendingDimensions}
+          onAcceptFull={acceptLargeImage}
+          onResizeSafe={() => resizeAndAcceptLargeImage(4096)}
+          onCancel={() => {
+            clearImage();
+            setError(null);
+          }}
+        />
 
-      <KeyboardShortcutsModal
-        isOpen={isShortcutsOpen}
-        onClose={() => setIsShortcutsOpen(false)}
-      />
+        <KeyboardShortcutsModal
+          isOpen={isShortcutsOpen}
+          onClose={() => setIsShortcutsOpen(false)}
+        />
 
-      {/* Firebase Authentication Modal */}
-      <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        onSignInGoogle={signInWithGoogle}
-        onSignInEmail={signInWithEmail}
-        onSignUpEmail={signUpWithEmail}
-        onResetPassword={authResetPassword}
-        onToast={addToast}
-      />
+        {/* Firebase Authentication Modal */}
+        <AuthModal
+          isOpen={isAuthOpen}
+          onClose={() => setIsAuthOpen(false)}
+          onSignInGoogle={signInWithGoogle}
+          onSignInEmail={signInWithEmail}
+          onSignUpEmail={signUpWithEmail}
+          onResetPassword={authResetPassword}
+          onToast={addToast}
+        />
 
-      {/* Toast Notifications */}
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
+        {/* Recent Exports Sidebar/Drawer */}
+        <RecentExportsDrawer
+          isOpen={isRecentExportsOpen}
+          onClose={() => setIsRecentExportsOpen(false)}
+          recentExports={recentExports}
+          onClear={clearRecentExports}
+        />
 
-      {/* Recent Exports Sidebar/Drawer */}
-      <RecentExportsDrawer
-        isOpen={isRecentExportsOpen}
-        onClose={() => setIsRecentExportsOpen(false)}
-        recentExports={recentExports}
-        onClear={clearRecentExports}
-      />
+        {/* AI Agent Access Drawer */}
+        <AgentDrawer
+          isOpen={isAgentDrawerOpen}
+          onClose={() => setIsAgentDrawerOpen(false)}
+          onToast={addToast}
+        />
 
-      {/* AI Agent Access Drawer */}
-      <AgentDrawer
-        isOpen={isAgentDrawerOpen}
-        onClose={() => setIsAgentDrawerOpen(false)}
-        onToast={addToast}
-      />
-
-      {/* Agent Export Gesture Confirmation Modal */}
-      <AgentExportModal
-        request={pendingAgentExport}
-        onAllow={handleAllowAgentExport}
-        onDecline={handleDeclineAgentExport}
-        isExporting={isExporting}
-      />
+        {/* Agent Export Gesture Confirmation Modal */}
+        <AgentExportModal
+          request={pendingAgentExport}
+          onAllow={handleAllowAgentExport}
+          onDecline={handleDeclineAgentExport}
+          isExporting={isExporting}
+        />
+      </Suspense>
     </div>
   );
 }

@@ -356,7 +356,8 @@ export function calculateSlices(
   }
 
   const prefix = namingPrefix.trim() || 'panel';
-  const upscaleTarget = settings.upscaleTarget || 'panel';
+  // Default to 'canvas' upscale target to prevent multi-gigabyte memory explosion on high panel counts
+  const upscaleTarget = settings.upscaleTarget || 'canvas';
 
   return orderedSlices.map((item, index) => {
     let effectiveMultiplier = canvasScaleMultiplier;
@@ -375,6 +376,12 @@ export function calculateSlices(
         effectiveMultiplier = Math.max(0.1, (customScalePercent || 100) / 100);
       } else {
         effectiveMultiplier = 1.0;
+      }
+
+      // 8K Memory Guardrail: Clamp max dimension to 8192px to prevent GPU/Skia texture allocation crashes
+      const projectedMax = Math.max(item.sourceWidth, item.sourceHeight) * effectiveMultiplier;
+      if (projectedMax > 8192) {
+        effectiveMultiplier = Number((8192 / Math.max(item.sourceWidth, item.sourceHeight)).toFixed(4));
       }
     }
 
@@ -995,6 +1002,14 @@ export async function generatePanelOutputs(
           type: mimeType,
           quality: qualityFactor,
         });
+
+        // Immediately zero dimensions to release GPU textures from VRAM
+        try {
+          offscreen.width = 1;
+          offscreen.height = 1;
+        } catch {
+          // Ignore if environment prevents resizing
+        }
       } else {
         // Fallback to standard HTMLCanvasElement
         const canvas = document.createElement('canvas');
@@ -1484,8 +1499,13 @@ export function detectPictureBorders(
   }
 }
 
-// Run engine test suite once on startup to ensure production mathematical integrity
-const testResults = runAutomatedSplitTestSuite(calculateSlices);
-if (!testResults.allPassed) {
-  console.error('[SplitEngine] Automated split test suite encountered errors:', testResults.results);
+// Run engine test suite in test or development environments to ensure production mathematical integrity
+if (
+  (typeof process !== 'undefined' && (process.env?.NODE_ENV === 'test' || process.env?.VITEST)) ||
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV)
+) {
+  const testResults = runAutomatedSplitTestSuite(calculateSlices);
+  if (!testResults.allPassed) {
+    console.error('[SplitEngine] Automated split test suite encountered errors:', testResults.results);
+  }
 }

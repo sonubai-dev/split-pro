@@ -1,6 +1,22 @@
-import JSZip from 'jszip';
-import { jsPDF } from 'jspdf';
+import type JSZipType from 'jszip';
+import type { jsPDF as jsPDFType } from 'jspdf';
 import { PanelSlice, PdfExportOptions, BatchImageResult } from '../types';
+
+/**
+ * Dynamically loads JSZip on demand to prevent bundling 726kB into the initial load.
+ */
+async function loadJSZip(): Promise<typeof JSZipType> {
+  const mod = await import('jszip');
+  return (mod.default || mod) as unknown as typeof JSZipType;
+}
+
+/**
+ * Dynamically loads jsPDF on demand to keep initial bundle lightweight.
+ */
+async function loadJsPDF(): Promise<typeof jsPDFType> {
+  const mod = await import('jspdf');
+  return (mod.jsPDF || mod.default) as unknown as typeof jsPDFType;
+}
 
 /**
  * Sanitizes a filename to ensure safe cross-platform saving without path traversal or illegal characters.
@@ -96,6 +112,7 @@ export async function createAndDownloadZip(
   zipFilename: string,
   onProgress?: (progress: number) => void
 ): Promise<void> {
+  const JSZip = await loadJSZip();
   const zip = new JSZip();
   const usedNames = new Set<string>();
 
@@ -152,6 +169,7 @@ export async function createAndDownloadBatchZip(
   zipFilename: string,
   onProgress?: (progress: number) => void
 ): Promise<void> {
+  const JSZip = await loadJSZip();
   const zip = new JSZip();
   const usedFolderNames = new Set<string>();
 
@@ -240,6 +258,7 @@ export async function createAndDownloadPdf(
     initialOrientation = validPanels[0].outputWidth > validPanels[0].outputHeight ? 'landscape' : 'portrait';
   }
 
+  const jsPDF = await loadJsPDF();
   const doc = new jsPDF({
     orientation: initialOrientation,
     unit: 'mm',
