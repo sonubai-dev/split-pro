@@ -32,6 +32,7 @@ async function testMcpDirect() {
 
   await client.close();
   console.log('\n✅ MCP Test Completed Successfully!');
+  process.exit(0);
 }
 
 testMcpDirect().catch((err) => {
