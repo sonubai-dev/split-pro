@@ -161,6 +161,46 @@ export const toolsCatalog: ToolDefinition[] = [
     schema: {},
     handler: async () => dispatchToBrowser('detect_borders'),
   },
+  {
+    name: 'vistaro_capture_canvas_preview',
+    description:
+      'Capture a visual snapshot of the active canvas with slice grid lines overlaid, returning an image preview data URL for multimodal visual inspection.',
+    schema: {},
+    handler: async () => dispatchToBrowser('capture_canvas_preview'),
+  },
+  {
+    name: 'vistaro_smart_platform_preset',
+    description:
+      'Automatically configure canvas layout, aspect ratio, rows, columns, and quality presets optimized for specific social platforms (Instagram Carousel, Instagram 3x3 Mosaic, TikTok/Reel 9:16 vertical, Discord 2x2, Webtoon Strip).',
+    schema: {
+      platform: z
+        .enum([
+          'instagram_carousel',
+          'instagram_mosaic_9',
+          'tiktok_reel',
+          'discord_quad',
+          'webtoon_strip',
+        ])
+        .describe('Target social media platform layout'),
+    },
+    handler: async (args: any) => dispatchToBrowser('smart_platform_preset', args),
+  },
+  {
+    name: 'vistaro_batch_pipeline',
+    description:
+      'Execute a multi-step sequence of canvas adjustments sequentially in a single compound atomic transaction.',
+    schema: {
+      steps: z
+        .array(
+          z.object({
+            tool: z.string().describe('Tool name to execute in pipeline'),
+            args: z.record(z.string(), z.any()).optional().describe('Arguments for tool'),
+          })
+        )
+        .describe('List of sequential tool steps to execute'),
+    },
+    handler: async (args: any) => dispatchToBrowser('batch_pipeline', args),
+  },
 ];
 
 export function registerMcpTools(server: McpServer) {

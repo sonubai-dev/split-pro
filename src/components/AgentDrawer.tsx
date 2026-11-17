@@ -37,6 +37,7 @@ import {
   generateClaudeToolsJson,
   generateExternalAgentScript,
   executeAgentTool,
+  subscribeMcpBridgeStatus,
   AGENT_TOOLS,
 } from '../agent/tools';
 import { AgentAccessState, ToolName } from '../agent/types';
@@ -71,11 +72,20 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
   const drawerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
+  const [isMcpLive, setIsMcpLive] = useState(false);
+
   // Subscribe to agent state changes
   useEffect(() => {
-    return subscribeAgentState((newState) => {
+    const unsubState = subscribeAgentState((newState) => {
       setState(newState);
     });
+    const unsubMcp = subscribeMcpBridgeStatus((live) => {
+      setIsMcpLive(live);
+    });
+    return () => {
+      unsubState();
+      unsubMcp();
+    };
   }, []);
 
   // Check if WebMCP is detected
@@ -536,9 +546,178 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
         {/* Tab 2: EXTERNAL AGENTS (ChatGPT & Claude) */}
         {activeTab === 'external' && (
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
-            <div className="p-3 rounded-lg bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 text-xs text-blue-900 dark:text-blue-200 leading-relaxed">
-              <span className="font-semibold block mb-1">🤖 Connect Any External AI:</span>
-              Export native tool declarations for ChatGPT or Claude, or execute tools live across contexts using the <code className="bg-blue-100 dark:bg-blue-900/60 px-1 py-0.5 rounded font-mono">window.VistaroAI</code> and <code className="bg-blue-100 dark:bg-blue-900/60 px-1 py-0.5 rounded font-mono">postMessage</code> APIs.
+            {/* Live MCP Status Banner */}
+            <div
+              className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
+                isMcpLive
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-3 w-3 shrink-0">
+                  {isMcpLive && (
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  )}
+                  <span
+                    className={`relative inline-flex rounded-full h-3 w-3 ${
+                      isMcpLive ? 'bg-emerald-500' : 'bg-amber-500'
+                    }`}
+                  ></span>
+                </span>
+                <div>
+                  <h4 className="text-xs font-bold font-mono">
+                    {isMcpLive ? 'MCP BRIDGE: CONNECTED' : 'MCP BRIDGE: STANDBY'}
+                  </h4>
+                  <p className="text-[11px] opacity-80">
+                    {isMcpLive
+                      ? 'Live on ws://localhost:3001. External agents can control this browser window.'
+                      : 'Run "npm run mcp" in terminal to connect Claude Desktop or ChatGPT.'}
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-black/10 dark:bg-white/10">
+                Port 3001 / 3002
+              </span>
+            </div>
+
+            {/* Quick Setup 1: ChatGPT Custom GPT Action */}
+            <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/20 dark:bg-emerald-950/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                    GPT
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">
+                      ChatGPT Custom GPT Action (OpenAPI 3.1.0)
+                    </h3>
+                    <p className="text-[10px] text-gray-500">
+                      Operate Vistaro from ChatGPT Web & Mobile app
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copyToClipboard(
+                        'http://localhost:3002/openapi.json',
+                        'ChatGPT Schema URL',
+                        'Schema URL Copied'
+                      )
+                    }
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors flex items-center gap-1.5"
+                  >
+                    {copiedType === 'ChatGPT Schema URL' ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                    <span>{copiedType === 'ChatGPT Schema URL' ? 'Copied URL!' : 'Copy Schema URL'}</span>
+                  </button>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-600 dark:text-gray-300">
+                In ChatGPT Custom GPT Editor &rarr; Actions &rarr; Import from URL &rarr; paste your tunnel URL with <code className="text-emerald-600 font-mono">/openapi.json</code>.
+              </p>
+            </div>
+
+            {/* Quick Setup 2: Claude Desktop (MCP Stdio) */}
+            <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/30 dark:bg-blue-950/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-md bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                    MCP
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">
+                      Claude Desktop MCP Configuration
+                    </h3>
+                    <p className="text-[10px] text-gray-500">
+                      Claude Desktop, Antigravity & Cursor native connection
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyToClipboard(
+                      JSON.stringify(
+                        {
+                          mcpServers: {
+                            vistaro: {
+                              command: 'cmd.exe',
+                              args: [
+                                '/c',
+                                'npx',
+                                '-y',
+                                'tsx',
+                                'c:\\Users\\s k mo shop\\Desktop\\vistaro\\split-pro\\mcp-server\\server.ts',
+                              ],
+                            },
+                          },
+                        },
+                        null,
+                        2
+                      ),
+                      'MCP Server Config',
+                      'MCP Config Copied'
+                    )
+                  }
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors flex items-center gap-1.5"
+                >
+                  {copiedType === 'MCP Server Config' ? (
+                    <Check className="w-3.5 h-3.5" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                  <span>{copiedType === 'MCP Server Config' ? 'Copied!' : 'Copy Config'}</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-600 dark:text-gray-300">
+                Paste into <code className="text-blue-500 font-mono">%APPDATA%\Claude\claude_desktop_config.json</code> to give Claude full control.
+              </p>
+            </div>
+
+            {/* Quick Setup 3: Claude Mobile & Remote SSE */}
+            <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/20 dark:bg-purple-950/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-md bg-purple-600 text-white flex items-center justify-center font-bold text-xs">
+                    SSE
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">
+                      Claude Mobile & Remote MCP (SSE)
+                    </h3>
+                    <p className="text-[10px] text-gray-500">
+                      Remote Server-Sent Events transport endpoint
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyToClipboard(
+                      'http://localhost:3002/sse',
+                      'SSE Endpoint URL',
+                      'SSE URL Copied'
+                    )
+                  }
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition-colors flex items-center gap-1.5"
+                >
+                  {copiedType === 'SSE Endpoint URL' ? (
+                    <Check className="w-3.5 h-3.5" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                  <span>{copiedType === 'SSE Endpoint URL' ? 'Copied!' : 'Copy SSE URL'}</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-600 dark:text-gray-300">
+                Use with remote MCP proxies or tunnels for mobile Claude client connections.
+              </p>
             </div>
 
             {/* Option A: Claude (Anthropic) */}

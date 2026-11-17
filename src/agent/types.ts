@@ -24,7 +24,10 @@ export type ToolName =
   | 'redo'
   | 'reset'
   | 'load_sample'
-  | 'detect_borders';
+  | 'detect_borders'
+  | 'capture_canvas_preview'
+  | 'smart_platform_preset'
+  | 'batch_pipeline';
 
 export interface AgentToolResult<T = any> {
   ok: boolean;
@@ -95,6 +98,7 @@ export interface AgentBridgeMethods {
   reorderPanels: (newOrder: number[]) => void;
   renamePanel: (index: number, newName: string) => void;
   triggerExportZip: () => Promise<void>;
+  captureCanvasPreview?: () => Promise<string | null>;
 
   // Video storyboard automation
   openVideoDrawer?: () => void;

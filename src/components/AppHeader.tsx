@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { subscribeMcpBridgeStatus } from '../agent/tools';
 import {
   Scissors,
   Moon,
@@ -65,6 +66,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMcpBridgeLive, setIsMcpBridgeLive] = useState(false);
+
+  useEffect(() => {
+    return subscribeMcpBridgeStatus((live) => setIsMcpBridgeLive(live));
+  }, []);
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-[#0B0F17]/90 backdrop-blur-md text-slate-800 dark:text-[#E5E7EB] select-none transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
@@ -205,16 +211,31 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               type="button"
               onClick={onOpenAgent}
               aria-label="Agent Access"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 transition-colors shadow-2xs"
-              title="Open AI Agent Access Drawer"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-mono font-medium transition-all shadow-2xs ${
+                isMcpBridgeLive
+                  ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-500/20'
+                  : 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800'
+              }`}
+              title={
+                isMcpBridgeLive
+                  ? 'MCP Bridge Live: Connected to external AI (Claude / ChatGPT)'
+                  : 'Open AI Agent Access Drawer'
+              }
             >
               <Bot className="w-3.5 h-3.5" />
               <span className="font-semibold">Agent</span>
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isAgentPaused ? 'bg-amber-500' : 'bg-emerald-500'
-                }`}
-              />
+              {isMcpBridgeLive ? (
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+              ) : (
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isAgentPaused ? 'bg-amber-500' : 'bg-emerald-500'
+                  }`}
+                />
+              )}
             </button>
           )}
 

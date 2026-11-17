@@ -361,6 +361,96 @@ export function getOpenApiSpec(serverUrl = 'http://localhost:3002') {
           },
         },
       },
+      '/api/v1/workspace/preview-image': {
+        get: {
+          operationId: 'captureCanvasPreviewGet',
+          summary: 'Capture Canvas Visual Preview',
+          description:
+            'Captures a visual snapshot/screenshot of the active canvas with slice grid guidelines overlaid as a JPEG data URL for multimodal visual inspection.',
+          responses: {
+            '200': { description: 'Visual canvas preview snapshot returned.' },
+          },
+        },
+        post: {
+          operationId: 'captureCanvasPreview',
+          summary: 'Capture Canvas Visual Preview (POST)',
+          description:
+            'Captures a visual snapshot/screenshot of the active canvas with slice grid guidelines overlaid as a JPEG data URL for multimodal visual inspection.',
+          responses: {
+            '200': { description: 'Visual canvas preview snapshot returned.' },
+          },
+        },
+      },
+      '/api/v1/workspace/platform-preset': {
+        post: {
+          operationId: 'setSmartPlatformPreset',
+          summary: 'Apply Social Platform Preset',
+          description:
+            'Auto-configure grid, aspect ratio, and resolution for Instagram Carousel, 3x3 Mosaic, TikTok Reel, Discord Quad, or Webtoon Strip.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['platform'],
+                  properties: {
+                    platform: {
+                      type: 'string',
+                      enum: [
+                        'instagram_carousel',
+                        'instagram_mosaic_9',
+                        'tiktok_reel',
+                        'discord_quad',
+                        'webtoon_strip',
+                      ],
+                      description: 'Target platform layout preset',
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Platform preset applied.' },
+          },
+        },
+      },
+      '/api/v1/workspace/batch-pipeline': {
+        post: {
+          operationId: 'executeBatchPipeline',
+          summary: 'Execute Compound Batch Pipeline',
+          description:
+            'Execute a sequential list of canvas adjustments in a single compound atomic transaction.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['steps'],
+                  properties: {
+                    steps: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        required: ['tool'],
+                        properties: {
+                          tool: { type: 'string' },
+                          args: { type: 'object' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Pipeline execution report returned.' },
+          },
+        },
+      },
       '/api/v1/execute': {
         post: {
           operationId: 'executeGenericTool',

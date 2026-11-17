@@ -65,6 +65,52 @@ async function runTests() {
     }
     console.log('✅ Set grid handler verified!');
 
+    // Test 5: Multimodal Visual Preview
+    console.log('\n--- 5. Testing POST /api/v1/workspace/preview-image ---');
+    const previewRes = await fetch(`http://localhost:${TEST_PORT}/api/v1/workspace/preview-image`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const previewData = await previewRes.json();
+    console.log('Preview image call response:', previewData);
+    if (!previewData.tool || previewData.tool !== 'capture_canvas_preview') {
+      throw new Error('Preview image handler failed');
+    }
+    console.log('✅ Multimodal visual preview verified!');
+
+    // Test 6: Smart Platform Preset
+    console.log('\n--- 6. Testing POST /api/v1/workspace/platform-preset ---');
+    const platformRes = await fetch(`http://localhost:${TEST_PORT}/api/v1/workspace/platform-preset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform: 'instagram_carousel' }),
+    });
+    const platformData = await platformRes.json();
+    console.log('Platform preset call response:', platformData);
+    if (!platformData.tool || platformData.tool !== 'smart_platform_preset') {
+      throw new Error('Platform preset handler failed');
+    }
+    console.log('✅ Smart platform preset verified!');
+
+    // Test 7: Compound Batch Pipeline
+    console.log('\n--- 7. Testing POST /api/v1/workspace/batch-pipeline ---');
+    const pipelineRes = await fetch(`http://localhost:${TEST_PORT}/api/v1/workspace/batch-pipeline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        steps: [
+          { tool: 'load_sample', args: { sampleType: 'cyberpunk' } },
+          { tool: 'set_grid', args: { rows: 3, columns: 3 } },
+        ],
+      }),
+    });
+    const pipelineData = await pipelineRes.json();
+    console.log('Batch pipeline call response:', pipelineData);
+    if (!pipelineData.tool || pipelineData.tool !== 'batch_pipeline') {
+      throw new Error('Batch pipeline handler failed');
+    }
+    console.log('✅ Compound batch pipeline verified!');
+
     console.log('\n🎉 ALL REMOTE BRIDGE TESTS PASSED (100% HEALTHY)!');
   } finally {
     await new Promise<void>((resolve) => {

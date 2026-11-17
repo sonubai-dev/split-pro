@@ -395,6 +395,44 @@ export default function App() {
           await handleBatchExportZip();
         }
       },
+      captureCanvasPreview: async () => {
+        if (!image?.url) return null;
+        try {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Image load failed'));
+            img.src = image.url;
+          });
+          const maxDim = 800;
+          const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+          const w = Math.round(img.naturalWidth * scale);
+          const h = Math.round(img.naturalHeight * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return null;
+          ctx.drawImage(img, 0, 0, w, h);
+          const slices = calculateSlices(image.width, image.height, settings);
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 6]);
+          for (const slice of slices) {
+            ctx.strokeRect(
+              slice.sourceX * scale,
+              slice.sourceY * scale,
+              slice.sourceWidth * scale,
+              slice.sourceHeight * scale
+            );
+          }
+          return canvas.toDataURL('image/jpeg', 0.82);
+        } catch (err) {
+          console.warn('[Vistaro Agent] captureCanvasPreview error:', err);
+          return null;
+        }
+      },
       openVideoDrawer: () => {
         workspaceBridgeRef.current?.openVideoDrawer?.();
       },

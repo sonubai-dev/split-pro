@@ -215,6 +215,22 @@ app.post('/api/v1/workspace/detect-borders', authMiddleware, async (_req, res) =
   await handleAction('detect_borders', {}, res);
 });
 
+app.get('/api/v1/workspace/preview-image', authMiddleware, async (_req, res) => {
+  await handleAction('capture_canvas_preview', {}, res);
+});
+
+app.post('/api/v1/workspace/preview-image', authMiddleware, async (_req, res) => {
+  await handleAction('capture_canvas_preview', {}, res);
+});
+
+app.post('/api/v1/workspace/platform-preset', authMiddleware, async (req, res) => {
+  await handleAction('smart_platform_preset', req.body, res);
+});
+
+app.post('/api/v1/workspace/batch-pipeline', authMiddleware, async (req, res) => {
+  await handleAction('batch_pipeline', req.body, res);
+});
+
 // Generic Tool Execution Fallback
 app.post('/api/v1/execute', authMiddleware, async (req, res) => {
   const { tool, args } = req.body || {};
