@@ -63,7 +63,7 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
   onToast,
 }) => {
   const [state, setState] = useState<AgentAccessState>(getAgentState);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [activeTab, setActiveTab] = useState<TabType>('external');
   const [copiedType, setCopiedType] = useState<string | null>(null);
   
   // Simulator state
@@ -320,38 +320,13 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Pause Agent Switch */}
-            <button
-              type="button"
-              onClick={() => setAgentPaused(!state.isPaused)}
-              aria-label={state.isPaused ? 'Resume Agent' : 'Pause Agent'}
-              className={`min-h-[40px] px-2.5 py-1.5 rounded-lg text-xs font-mono font-semibold flex items-center gap-1.5 border transition-all ${
-                state.isPaused
-                  ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-                  : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
-              }`}
-              title={state.isPaused ? 'Agent calls are blocked' : 'Agent calls are allowed'}
-            >
-              {state.isPaused ? (
-                <>
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Resume</span>
-                </>
-              ) : (
-                <>
-                  <Pause className="w-3.5 h-3.5 fill-current" />
-                  <span>Active</span>
-                </>
-              )}
-            </button>
-
             {/* Close Button */}
             <button
               ref={closeButtonRef}
               type="button"
               onClick={onClose}
               aria-label="Close Agent Access Drawer"
-              className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#1F2937] transition-colors"
+              className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#1F2937] transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -362,51 +337,39 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
         <div className="flex items-center border-b border-gray-200 dark:border-[#1F2937] bg-gray-50/50 dark:bg-[#111827] px-4 shrink-0 text-xs font-medium">
           <button
             type="button"
+            onClick={() => setActiveTab('external')}
+            className={`py-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'external'
+                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-semibold'
+                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>API Key & Endpoints</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('overview')}
-            className={`py-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`py-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'overview'
                 ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-semibold'
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Overview</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('external')}
-            className={`py-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'external'
-                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-semibold'
-                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            <Cpu className="w-3.5 h-3.5" />
-            <span>ChatGPT / Claude</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('simulator')}
-            className={`py-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'simulator'
-                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-semibold'
-                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            <PlayCircle className="w-3.5 h-3.5" />
-            <span>Copilot Runner</span>
+            <span>Tools ({AGENT_TOOLS.length})</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('logs')}
-            className={`py-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`py-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'logs'
                 ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-semibold'
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>Logs ({state.logs.length})</span>
+            <span>Activity Logs ({state.logs.length})</span>
           </button>
         </div>
 
@@ -414,33 +377,22 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
         {activeTab === 'overview' && (
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
             {/* Status Chip */}
-            <div className="p-3.5 rounded-xl border border-gray-200 dark:border-[#1F2937] bg-gray-50 dark:bg-[#131B2B] flex items-center justify-between gap-3">
+            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span
-                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                      state.isPaused ? 'bg-amber-400' : 'bg-emerald-400'
-                    }`}
-                  />
-                  <span
-                    className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                      state.isPaused ? 'bg-amber-500' : 'bg-emerald-500'
-                    }`}
-                  />
-                </span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                 <div>
-                  <span className="text-xs font-mono font-semibold text-gray-900 dark:text-white block">
-                    {state.isPaused ? 'Agent Suspended' : 'Agent Ready & Connected'}
+                  <span className="text-xs font-mono font-semibold text-slate-900 dark:text-white block">
+                    MCP Tools Ready
                   </span>
-                  <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
-                    window.VistaroAI · postMessage · CustomEvents active
+                  <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                    Direct execution via API Key & Stdio / SSE Transport
                   </span>
                 </div>
               </div>
 
               <div className="text-right">
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium">
-                  {Object.values(state.toolToggles).filter(Boolean).length}/{AGENT_TOOLS.length} ENABLED
+                  {AGENT_TOOLS.length} TOOLS AVAILABLE
                 </span>
               </div>
             </div>
@@ -552,7 +504,7 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
                     <li>• Local device file picking</li>
                     <li>• Final ZIP export download</li>
                     <li>• Clearing export history</li>
-                    <li>• Instant agent pause switch</li>
+                    <li>• API Key & Token verification</li>
                   </ul>
                 </div>
               </div>

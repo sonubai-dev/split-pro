@@ -29,6 +29,9 @@ const AgentExportModal = lazy(() =>
   import('./components/AgentExportModal').then((m) => ({ default: m.AgentExportModal }))
 );
 const AuthModal = lazy(() => import('./components/AuthModal').then((m) => ({ default: m.AuthModal })));
+const AdminPanelModal = lazy(() =>
+  import('./components/AdminPanelModal').then((m) => ({ default: m.AdminPanelModal }))
+);
 
 const ViewLoadingFallback: React.FC = () => (
   <div className="flex-1 flex items-center justify-center min-h-[60vh] bg-white dark:bg-[#0B0F17]">
@@ -92,6 +95,7 @@ export default function App() {
   // Modal states
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isRecentExportsOpen, setIsRecentExportsOpen] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const { recentExports, addRecentExport, clearRecentExports } = useRecentExports();
   
   // View routing: 'home' | 'dashboard' | 'slicer' | 'video'
@@ -573,6 +577,7 @@ export default function App() {
         user={user}
         onOpenAuth={() => setIsAuthOpen(true)}
         onSignOut={logOut}
+        onOpenAdminPanel={() => setIsAdminModalOpen(true)}
       />
 
       {/* Main Content View Routing */}
@@ -596,6 +601,7 @@ export default function App() {
                 setCurrentView('slicer');
               }}
               onNavigate={(v) => setCurrentView(v)}
+              onOpenAdminPanel={() => setIsAdminModalOpen(true)}
             />
           )}
 
@@ -611,9 +617,14 @@ export default function App() {
                 loadImagesFromFiles(files);
                 setCurrentView('slicer');
               }}
+              onSampleSelected={(url, name) => {
+                loadImageFromUrl(url, name || 'sample_image.jpg');
+                setCurrentView('slicer');
+              }}
               recentExports={recentExports}
               onClearRecentExports={clearRecentExports}
               onNavigate={(v) => setCurrentView(v)}
+              onOpenAdminPanel={() => setIsAdminModalOpen(true)}
             />
           )}
 
@@ -623,6 +634,7 @@ export default function App() {
               onNavigate={(v) => setCurrentView(v)}
               existingPanels={workspaceBridgeRef.current?.getPanels?.() || []}
               onToast={addToast}
+              onOpenAdminPanel={() => setIsAdminModalOpen(true)}
             />
           )}
 
@@ -727,6 +739,15 @@ export default function App() {
           onSignInEmail={signInWithEmail}
           onSignUpEmail={signUpWithEmail}
           onResetPassword={authResetPassword}
+          onToast={addToast}
+        />
+
+        {/* Super Admin Control Panel Modal */}
+        <AdminPanelModal
+          isOpen={isAdminModalOpen}
+          onClose={() => setIsAdminModalOpen(false)}
+          currentUser={user}
+          onSignInEmail={signInWithEmail}
           onToast={addToast}
         />
 

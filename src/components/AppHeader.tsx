@@ -41,6 +41,7 @@ interface AppHeaderProps {
   user?: any;
   onOpenAuth?: () => void;
   onSignOut?: () => void;
+  onOpenAdminPanel?: () => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -63,6 +64,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   user,
   onOpenAuth,
   onSignOut,
+  onOpenAdminPanel,
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -71,6 +73,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   useEffect(() => {
     return subscribeMcpBridgeStatus((live) => setIsMcpBridgeLive(live));
   }, []);
+
+  const isSuperAdmin = user?.email?.toLowerCase() === 'ssdd747346@gmail.com' || user?.role === 'super_admin' || user?.role === 'admin';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#0B0E14]/95 backdrop-blur-md text-slate-800 dark:text-slate-100 select-none transition-colors">
@@ -148,7 +152,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <div className="flex items-center gap-2 sm:gap-2.5">
           {currentView === 'slicer' && hasImage && (
             <>
-              {/* Dedicated "Download All as Zip" button directly in header when multiple images are loaded */}
+              {/* Dedicated "Download All as Zip" button */}
               {batchCount && batchCount > 1 && onDownloadAllZip && (
                 <button
                   id="btn-header-download-all-zip"
@@ -210,41 +214,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             </button>
           )}
 
-          {/* Agent Access Trigger */}
-          {onOpenAgent && (
-            <button
-              id="btn-header-agent"
-              type="button"
-              onClick={onOpenAgent}
-              aria-label="Agent Access"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all cursor-pointer ${
-                isMcpBridgeLive
-                  ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-500/20'
-                  : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
-              }`}
-              title={
-                isMcpBridgeLive
-                  ? 'MCP Bridge Live: Connected to external AI (Claude / ChatGPT)'
-                  : 'Open AI Agent Access Drawer'
-              }
-            >
-              <Bot className="w-3.5 h-3.5" />
-              <span className="font-semibold">Agent</span>
-              {isMcpBridgeLive ? (
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-              ) : (
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isAgentPaused ? 'bg-amber-500' : 'bg-emerald-500'
-                  }`}
-                />
-              )}
-            </button>
-          )}
-
           {/* Recent Exports Trigger */}
           {onOpenRecentExports && (
             <button
@@ -252,7 +221,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               type="button"
               onClick={onOpenRecentExports}
               aria-label="Recent Exports"
-              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
               title="Recent Exports"
             >
               <History className="w-4 h-4" />
@@ -265,7 +234,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             type="button"
             onClick={onOpenShortcuts}
             aria-label="Keyboard Shortcuts"
-            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
             title="Keyboard Shortcuts"
           >
             <Keyboard className="w-4 h-4" />
@@ -277,7 +246,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             type="button"
             onClick={toggleTheme}
             aria-label="Toggle Theme"
-            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
             title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
           >
             {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
@@ -317,7 +286,27 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                       {user.email}
                     </p>
+                    {isSuperAdmin && (
+                      <span className="inline-block mt-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800">
+                        Super Admin
+                      </span>
+                    )}
                   </div>
+                  {onOpenAdminPanel && (
+                    <div className="py-1 border-b border-slate-100 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          onOpenAdminPanel();
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer font-medium"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#E05D26]" />
+                        <span>Admin Console</span>
+                      </button>
+                    </div>
+                  )}
                   <div className="pt-1">
                     <button
                       type="button"
@@ -423,6 +412,19 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             <Film className="w-4 h-4" />
             <span>Motion Video Studio</span>
           </button>
+          {onOpenAdminPanel && (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenAdminPanel();
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[#E05D26] bg-[#E05D26]/10 hover:bg-[#E05D26]/20 transition-all cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Admin Console</span>
+            </button>
+          )}
         </div>
       )}
     </header>

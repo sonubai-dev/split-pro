@@ -50,6 +50,16 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 // Firestore is used exclusively for lightweight user profile metadata and preferences.
 export const db = getFirestore(app);
 
+export const SUPER_ADMIN_EMAIL = 'ssdd747346@gmail.com';
+
+/**
+ * Check if a given user is the system Super Admin
+ */
+export function isUserSuperAdmin(user: User | null | { email?: string | null }): boolean {
+  if (!user || !user.email) return false;
+  return user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+}
+
 /**
  * Synchronize user metadata to Firestore users collection
  */
@@ -58,12 +68,15 @@ export async function syncUserProfile(user: User) {
   try {
     const userRef = doc(db, 'users', user.uid);
     const existing = await getDoc(userRef);
+    const isAdmin = isUserSuperAdmin(user);
     const payload: Record<string, any> = {
       uid: user.uid,
       email: user.email || '',
-      displayName: user.displayName || '',
+      displayName: user.displayName || (isAdmin ? 'Super Admin' : 'Creator'),
       photoURL: user.photoURL || '',
       lastLoginAt: serverTimestamp(),
+      role: isAdmin ? 'super_admin' : (existing.exists() ? existing.data()?.role || 'user' : 'user'),
+      isAdmin,
     };
     if (!existing.exists()) {
       payload.createdAt = serverTimestamp();
@@ -100,14 +113,34 @@ export async function signUpWithEmail(email: string, pass: string, displayName?:
 }
 
 /**
- * Sign In with Email and Password
+ * Sign In with Email and Password (with Super Admin auto-provisioning)
  */
 export async function signInWithEmail(email: string, pass: string) {
-  const result = await signInWithEmailAndPassword(auth, email, pass);
-  if (result.user) {
-    await syncUserProfile(result.user);
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, pass);
+    if (result.user) {
+      await syncUserProfile(result.user);
+    }
+    return result.user;
+  } catch (err: any) {
+    // If Super Admin credentials are provided and account doesn't exist yet, auto-register
+    if (
+      email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase() &&
+      (err?.code === 'auth/user-not-found' || err?.code === 'auth/invalid-credential')
+    ) {
+      try {
+        const created = await createUserWithEmailAndPassword(auth, email, pass);
+        if (created.user) {
+          await updateProfile(created.user, { displayName: 'Super Admin' });
+          await syncUserProfile(created.user);
+          return created.user;
+        }
+      } catch (signupErr) {
+        console.warn('Super Admin auto-registration attempt error:', signupErr);
+      }
+    }
+    throw err;
   }
-  return result.user;
 }
 
 /**

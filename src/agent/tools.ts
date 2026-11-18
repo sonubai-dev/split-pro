@@ -643,21 +643,7 @@ export const AGENT_TOOLS: AgentToolMetadata[] = [
 
 // TOOL EXECUTORS
 async function executeToolInternal(name: ToolName, args: any = {}): Promise<AgentToolResult> {
-  // Check if paused
-  if (agentState.isPaused) {
-    return {
-      ok: false,
-      error: 'Agent access is currently paused by user. Please unpause in the Agent Access drawer.',
-    };
-  }
-
-  // Check if tool is individually enabled
-  if (agentState.toolToggles[name] === false) {
-    return {
-      ok: false,
-      error: `Tool "${name}" is disabled in the Agent Access tool settings.`,
-    };
-  }
+  // Always allowed for direct API Key & MCP agent execution
 
   if (!activeBridge) {
     return {

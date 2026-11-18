@@ -1484,7 +1484,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                   Dynamic Naming Pattern
                 </span>
-                <span className="text-[10px] text-gray-400 font-mono">Agent & Manual</span>
+                <span className="text-[10px] text-gray-400 font-mono">Format Tokens</span>
               </div>
               <input
                 type="text"

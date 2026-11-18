@@ -24,6 +24,7 @@ interface LandingPageProps {
   onImagesSelected?: (files: File[]) => void;
   onSampleSelected?: (url: string, name: string) => void;
   onNavigate?: (view: 'home' | 'dashboard' | 'slicer' | 'video') => void;
+  onOpenAdminPanel?: () => void;
 }
 
 const FAQS = [
@@ -57,6 +58,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onImagesSelected,
   onSampleSelected,
   onNavigate,
+  onOpenAdminPanel,
 }) => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [activePreset, setActivePreset] = useState<'carousel' | 'square' | 'story'>('carousel');
@@ -467,7 +469,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Footer */}
-      <Footer onNavigate={onNavigate} />
+      <Footer onNavigate={onNavigate} onOpenAdminPanel={onOpenAdminPanel} />
     </div>
   );
 };

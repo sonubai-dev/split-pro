@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Scissors,
   Film,
@@ -7,73 +7,58 @@ import {
   Clock,
   Sparkles,
   Layers,
-  Zap,
-  Grid,
   FileArchive,
   Download,
   Trash2,
-  Video,
-  Play,
-  Check,
-  Eye,
-  LayoutGrid,
-  X,
-  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  HelpCircle,
+  CheckCircle2,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Footer } from './Footer';
 import { RecentExport } from '../hooks/useRecentExports';
+import { getCyberpunkStoryboardSample } from '../lib/sampleArtGenerator';
 
 interface DashboardProps {
   onOpenSlicer: () => void;
   onOpenVideoStudio: () => void;
   onImageSelected: (file: File) => void;
   onImagesSelected: (files: File[]) => void;
+  onSampleSelected?: (url: string, name: string) => void;
   recentExports: RecentExport[];
   onClearRecentExports: () => void;
   onNavigate: (view: 'home' | 'dashboard' | 'slicer' | 'video') => void;
+  onOpenAdminPanel?: () => void;
 }
 
-const QUICK_PRESETS = [
-  {
-    id: 'reel',
-    title: 'Instagram Reel',
-    desc: '9:16 vertical video with 3s Ken Burns zoom motion & fade transitions.',
-    badge: 'VIDEO',
-    target: 'video' as const,
-  },
-  {
-    id: 'youtube',
-    title: 'YouTube Storyboard',
-    desc: '16:9 widescreen video with 5s smooth cinematic pan motion.',
-    badge: 'VIDEO',
-    target: 'video' as const,
-  },
-  {
-    id: 'grid3x3',
-    title: '3×3 Instagram Mosaic',
-    desc: 'Precision 9-panel split grid with lossless 8K Ultra-HD enhancement.',
-    badge: 'SLICER',
-    target: 'slicer' as const,
-  },
+const TOP_PRESETS = [
   {
     id: 'carousel',
     title: 'Seamless Swipe Carousel',
-    desc: '1×3 or 1×5 horizontal panorama split for seamless multi-slide posts.',
-    badge: 'SLICER',
+    ratio: '4:5',
+    desc: 'Panorama split into 3 continuous seamless slides for Instagram.',
     target: 'slicer' as const,
   },
   {
-    id: 'ultra8k',
-    title: '8K Ultra Master Slice',
-    desc: 'Progressive upscaling up to 7680px with razor-sharp contour definition.',
-    badge: '8K UHD',
+    id: 'grid3x3',
+    title: '3×3 Profile Mosaic Grid',
+    ratio: '1:1',
+    desc: 'Precision 9-panel split grid for square profile feed layouts.',
     target: 'slicer' as const,
   },
   {
-    id: 'story',
-    title: 'Story Slideshow',
-    desc: '9:16 vertical video with 4s random motion & slide wipe transitions.',
-    badge: 'VIDEO',
+    id: 'reel',
+    title: 'Vertical Reel & Story',
+    ratio: '9:16',
+    desc: 'Ken Burns pan & zoom motion video with transitions & music.',
+    target: 'video' as const,
+  },
+  {
+    id: 'widescreen',
+    title: 'Widescreen Motion Video',
+    ratio: '16:9',
+    desc: 'Cinematic horizontal storyboard slideshow with smooth pacing.',
     target: 'video' as const,
   },
 ];
@@ -83,40 +68,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenVideoStudio,
   onImageSelected,
   onImagesSelected,
+  onSampleSelected,
   recentExports,
   onClearRecentExports,
   onNavigate,
+  onOpenAdminPanel,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragAction, setDragAction] = useState<'slicer' | 'video'>('slicer');
-  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
-  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleMouseEnterProject = (id: string) => {
-    if (hoverTimerRef.current) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-    setHoveredProjectId(id);
-  };
-
-  const handleMouseLeaveProject = () => {
-    if (hoverTimerRef.current) {
-      clearTimeout(hoverTimerRef.current);
-    }
-    hoverTimerRef.current = setTimeout(() => {
-      setHoveredProjectId(null);
-    }, 220);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimerRef.current) {
-        clearTimeout(hoverTimerRef.current);
-      }
-    };
-  }, []);
+  const [targetStudio, setTargetStudio] = useState<'slicer' | 'video'>('slicer');
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -133,9 +94,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const files = Array.from(e.dataTransfer.files);
-      if (dragAction === 'video' || files.length > 1) {
+      if (targetStudio === 'video' || files.length > 1) {
         onImagesSelected(files);
-        if (dragAction === 'video') {
+        if (targetStudio === 'video') {
           onOpenVideoStudio();
         } else {
           onOpenSlicer();
@@ -150,9 +111,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files);
-      if (dragAction === 'video' || files.length > 1) {
+      if (targetStudio === 'video' || files.length > 1) {
         onImagesSelected(files);
-        if (dragAction === 'video') {
+        if (targetStudio === 'video') {
           onOpenVideoStudio();
         } else {
           onOpenSlicer();
@@ -164,25 +125,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  const handleLoadDemoSample = () => {
+    const sample = getCyberpunkStoryboardSample();
+    if (onSampleSelected) {
+      onSampleSelected(sample.url, sample.name);
+    } else {
+      onOpenSlicer();
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F17] text-slate-900 dark:text-slate-100 flex flex-col transition-colors">
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 space-y-10">
-        {/* Dashboard Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800/80 pb-6">
+    <div className="min-h-screen bg-[#FDFCFB] dark:bg-[#0B0E14] text-slate-900 dark:text-slate-100 flex flex-col transition-colors">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 space-y-10">
+        {/* Hidden File Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png, image/jpeg, image/webp, image/jpg, image/avif"
+          multiple
+          className="hidden"
+          onChange={handleFileChange}
+        />
+
+        {/* 1. Header Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono font-bold tracking-wider text-violet-600 dark:text-violet-400 uppercase">
-                CREATOR DASHBOARD
+              <span className="text-[11px] font-mono tracking-wider text-[#E05D26] uppercase font-bold">
+                CREATIVE STUDIO
               </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-800">
-                100% LOCAL PROCESSING
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-medium">
+                100% In-Browser Private
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Welcome to VistaroAI Studio
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+              What do you want to create?
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-              Select a studio tool, launch a creator preset, or drag files directly into your workspace.
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+              Drop artwork to slice into seamless carousels, or create an animated video slideshow.
             </p>
           </div>
 
@@ -190,15 +170,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={onOpenSlicer}
-              className="px-3.5 py-2 text-xs font-semibold rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 text-xs font-semibold rounded-lg text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
-              <Scissors className="w-3.5 h-3.5" />
+              <Scissors className="w-3.5 h-3.5 text-[#E05D26]" />
               <span>Storyboard Slicer</span>
             </button>
             <button
               type="button"
               onClick={onOpenVideoStudio}
-              className="px-3.5 py-2 text-xs font-semibold rounded-lg text-white bg-violet-600 hover:bg-violet-500 shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 text-xs font-semibold rounded-lg text-white bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
               <Film className="w-3.5 h-3.5" />
               <span>Motion Video Studio</span>
@@ -206,161 +186,147 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* SECTION 1: STUDIO TOOL LAUNCHERS (Two Large Cards) */}
-        <div>
-          <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-4">
-            STUDIO WORKSPACES
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Tool A: Storyboard Slicer Studio */}
-            <div
-              onClick={onOpenSlicer}
-              className="group rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-7 shadow-xs hover:shadow-xl hover:border-violet-500/50 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
-                    <Scissors className="w-6 h-6" />
-                  </div>
-                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800/40">
-                    PRECISION SLICER
-                  </span>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
-                    Storyboard Slicer Studio
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                    Slice high-resolution art, storyboards, comics, and panoramas into exact grids, carousels, or custom pixel dividers with 8K Ultra-HD progressive upscaling.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300 font-mono">
-                  <span>· Grids & Auto Detection</span>
-                  <span>· Custom Draggable Cut Lines</span>
-                  <span>· Lossless ZIP & PDF</span>
-                </div>
-              </div>
-
-              <div className="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
-                <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                  <span>Open Storyboard Slicer</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">8K Studio Master</span>
-              </div>
-            </div>
-
-            {/* Tool B: Motion Graphic Video Studio */}
-            <div
-              onClick={onOpenVideoStudio}
-              className="group rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-7 shadow-xs hover:shadow-xl hover:border-indigo-500/50 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
-                    <Film className="w-6 h-6" />
-                  </div>
-                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
-                    MOTION VIDEO
-                  </span>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                    Motion Graphic Video Studio
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                    Upload multiple images, storyboard slices, or video clips to create Ken Burns animated slideshows with custom transitions, audio soundtracks, and burned captions.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300 font-mono">
-                  <span>· Ken Burns Pan & Zoom</span>
-                  <span>· Multi-slide Transitions</span>
-                  <span>· 1080p MP4 Export</span>
-                </div>
-              </div>
-
-              <div className="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
-                <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                  <span>Create Motion Graphic Video</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">WebCodecs Hardware Enc</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 2: UNIVERSAL DRAG-AND-DROP UPLOAD ZONE */}
-        <div className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/50 p-6 sm:p-8 text-center transition-all hover:border-violet-500">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            className="hidden"
-            onChange={handleFileChange}
-          />
-
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className="space-y-4 max-w-md mx-auto"
-          >
-            <div className="w-12 h-12 rounded-xl bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 mx-auto flex items-center justify-center">
-              <Upload className="w-6 h-6" />
+        {/* 2. Universal Dropzone (Hero Choice 1B) */}
+        <section
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`relative rounded-2xl border-2 border-dashed p-8 sm:p-12 text-center transition-all ${
+            isDragging
+              ? 'border-[#E05D26] bg-[#E05D26]/5 scale-[1.01]'
+              : 'border-slate-300 dark:border-slate-700/80 bg-white dark:bg-slate-900/60 hover:border-slate-400 dark:hover:border-slate-600'
+          }`}
+        >
+          <div className="max-w-md mx-auto space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 mx-auto flex items-center justify-center shadow-xs">
+              <Upload className="w-6 h-6 text-[#E05D26]" />
             </div>
 
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Drag & Drop Media to Start
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Drop high-resolution images, photos, or video clips directly into your workspace.
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+                Drag & Drop Photos or Storyboards
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Supports ultra-wide panoramas, comics, PNG, JPG, and WebP up to 8K resolution.
               </p>
             </div>
 
-            <div className="flex items-center justify-center gap-2 pt-1">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => {
-                  setDragAction('slicer');
+                  setTargetStudio('slicer');
                   fileInputRef.current?.click();
                 }}
-                className="px-4 py-2 text-xs font-semibold rounded-lg text-white bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-[#E05D26] hover:bg-[#C94E1B] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs"
               >
-                Upload for Storyboard Slicer
+                <Scissors className="w-3.5 h-3.5" />
+                <span>Upload to Slice Image</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => {
-                  setDragAction('video');
+                  setTargetStudio('video');
                   fileInputRef.current?.click();
                 }}
-                className="px-4 py-2 text-xs font-semibold rounded-lg text-white bg-violet-600 hover:bg-violet-500 shadow-sm transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                Upload for Motion Video
+                <Film className="w-3.5 h-3.5" />
+                <span>Upload for Motion Video</span>
+              </button>
+            </div>
+
+            {/* Quick Demo Sample Action */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center gap-2 text-xs text-slate-500">
+              <span>Don't have a file ready?</span>
+              <button
+                type="button"
+                onClick={handleLoadDemoSample}
+                className="font-semibold text-[#E05D26] hover:underline cursor-pointer inline-flex items-center gap-1"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Try with Demo Artwork</span>
               </button>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* SECTION 3: 1-TAP CREATOR PRESETS */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              ONE-TAP CREATOR PRESETS
+        {/* 3. Collapsible 3-Step Guide (Choice 3 Yes) */}
+        <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-4 transition-colors">
+          <button
+            type="button"
+            onClick={() => setIsGuideOpen(!isGuideOpen)}
+            className="w-full flex items-center justify-between text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-[#E05D26]" />
+              <span className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">
+                How Vistaro works in 3 simple steps
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">
+                Guide
+              </span>
+            </div>
+            {isGuideOpen ? (
+              <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200" />
+            )}
+          </button>
+
+          {isGuideOpen && (
+            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
+                  <span className="w-4 h-4 rounded-full bg-[#E05D26] text-white flex items-center justify-center text-[10px]">
+                    1
+                  </span>
+                  <span>Add Your Image</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Drop any panorama, photo strip, or multi-panel art. Zero files are ever uploaded to cloud servers.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
+                  <span className="w-4 h-4 rounded-full bg-[#E05D26] text-white flex items-center justify-center text-[10px]">
+                    2
+                  </span>
+                  <span>Pick Grid or Draw Cuts</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Select 4:5 swipe carousels, 3×3 grids, or drag cut lines manually with sub-pixel snapping.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
+                  <span className="w-4 h-4 rounded-full bg-[#E05D26] text-white flex items-center justify-center text-[10px]">
+                    3
+                  </span>
+                  <span>Export Lossless</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Download 8K ultra-clear slices packed into a clean ZIP or PDF, or animate into a full MP4 video.
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* 4. Top 4 Formats (Choice 2B) */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              POPULAR FORMATS
             </h2>
-            <span className="text-xs text-slate-400 font-mono">INSTANT CONFIGURATION</span>
+            <span className="text-[11px] text-slate-400">Click any format to start</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {QUICK_PRESETS.map((preset) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {TOP_PRESETS.map((preset) => (
               <div
                 key={preset.id}
                 onClick={() => {
@@ -370,241 +336,109 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     onOpenSlicer();
                   }
                 }}
-                className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-2xs hover:shadow-md hover:border-violet-500/50 transition-all cursor-pointer flex flex-col justify-between"
+                className="group rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-2xs hover:shadow-md hover:border-[#E05D26]/60 transition-all cursor-pointer flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                      {preset.badge}
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      {preset.ratio}
                     </span>
-                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#E05D26] group-hover:translate-x-0.5 transition-all" />
                   </div>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-[#E05D26] transition-colors">
                     {preset.title}
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                     {preset.desc}
                   </p>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* SECTION 4: RECENT EXPORT ARCHIVES */}
-        {recentExports.length > 0 && (
-          <div className="border-t border-slate-200 dark:border-slate-800/80 pt-8">
-            <div className="flex items-center justify-between mb-4">
+        {/* 5. Recent Exports Section */}
+        {recentExports.length > 0 ? (
+          <section className="space-y-4 border-t border-slate-200 dark:border-slate-800 pt-8">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <FileArchive className="w-4 h-4 text-violet-600 dark:text-violet-400" />
-                <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                <FileArchive className="w-4 h-4 text-[#E05D26]" />
+                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-white">
                   RECENT EXPORTS ({recentExports.length})
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={onClearRecentExports}
-                className="text-xs font-mono text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors cursor-pointer"
+                className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Clear History</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 relative">
-              {recentExports.slice(0, 6).map((item) => {
-                const isHovered = hoveredProjectId === item.id;
-                const colCount = item.columns || (item.count === 4 ? 2 : 3);
-                const gridColsClass = colCount === 2 ? 'grid-cols-2' : colCount >= 4 ? 'grid-cols-4' : 'grid-cols-3';
-
-                return (
-                  <div
-                    key={item.id}
-                    className="relative group rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 transition-all duration-200 hover:border-violet-500/60 dark:hover:border-violet-500/60 hover:shadow-xl dark:hover:shadow-violet-950/20 cursor-pointer"
-                    onMouseEnter={() => handleMouseEnterProject(item.id)}
-                    onMouseLeave={handleMouseLeaveProject}
-                    onClick={() => setHoveredProjectId((prev) => (prev === item.id ? null : item.id))}
-                  >
-                    {/* Floating Hover-Preview Popover */}
-                    {isHovered && (
-                      <div
-                        role="tooltip"
-                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[320px] sm:w-[380px] p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 shadow-2xl dark:shadow-violet-950/80 z-50 pointer-events-auto transition-all animate-in fade-in zoom-in-95 duration-150"
-                        onMouseEnter={() => handleMouseEnterProject(item.id)}
-                        onMouseLeave={handleMouseLeaveProject}
-                      >
-                        {/* Popover Header */}
-                        <div className="flex items-center justify-between gap-2 pb-2.5 mb-3 border-b border-slate-100 dark:border-slate-800">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <Layers className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
-                              <h5 className="font-bold text-xs text-slate-900 dark:text-white truncate">
-                                {item.filename}
-                              </h5>
-                            </div>
-                            <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                              <span>{item.count} Slices</span>
-                              {item.rows && item.columns && (
-                                <span>· {item.rows}×{item.columns} Grid</span>
-                              )}
-                              <span className="text-violet-600 dark:text-violet-400 font-semibold">
-                                · {item.resolution || '8K Ultra-HD'}
-                              </span>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 shrink-0 font-medium">
-                            Ready
-                          </span>
-                        </div>
-
-                        {/* Slices Thumbnail Grid */}
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-[10px] font-mono uppercase text-slate-400 tracking-wider">
-                            <span>Slices Preview Matrix</span>
-                            <span>{item.count} items</span>
-                          </div>
-
-                          <div className={`grid gap-1.5 p-1.5 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-100 dark:border-slate-800/80 ${gridColsClass}`}>
-                            {item.thumbnails && item.thumbnails.length > 0 ? (
-                              item.thumbnails.slice(0, 9).map((thumb, idx) => {
-                                const sliceMeta = item.slices?.[idx];
-                                return (
-                                  <div
-                                    key={idx}
-                                    className="group/slice relative rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-800 aspect-video border border-slate-200/80 dark:border-slate-700/80 hover:border-violet-500 transition-colors shadow-xs"
-                                    title={sliceMeta?.name || `Slice #${idx + 1}`}
-                                  >
-                                    <img
-                                      src={thumb}
-                                      alt={`Slice #${idx + 1}`}
-                                      className="w-full h-full object-cover group-hover/slice:scale-105 transition-transform duration-200"
-                                      loading="lazy"
-                                    />
-                                    <div className="absolute top-1 left-1 px-1 py-0.2 rounded bg-black/75 backdrop-blur-xs text-[8px] font-mono font-bold text-white">
-                                      #{String(idx + 1).padStart(2, '0')}
-                                    </div>
-                                    {sliceMeta?.width && (
-                                      <div className="absolute bottom-1 right-1 opacity-0 group-hover/slice:opacity-100 transition-opacity px-1 py-0.2 rounded bg-black/85 text-[7px] font-mono text-slate-200">
-                                        {sliceMeta.width}×{sliceMeta.height}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              Array.from({ length: Math.min(item.count, 9) }).map((_, idx) => (
-                                <div
-                                  key={idx}
-                                  className="rounded-lg p-2 bg-slate-100 dark:bg-slate-800/80 aspect-video border border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center justify-center text-center"
-                                >
-                                  <span className="text-[10px] font-mono font-bold text-violet-600 dark:text-violet-400">
-                                    #{String(idx + 1).padStart(2, '0')}
-                                  </span>
-                                  <span className="text-[8px] text-slate-400 font-mono mt-0.5">
-                                    Slice
-                                  </span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                          {item.count > 9 && (
-                            <div className="text-[10px] text-center text-slate-400 font-mono pt-0.5">
-                              + {item.count - 9} more slices in archive
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Quick studio action buttons */}
-                        <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNavigate('slicer');
-                            }}
-                            className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <Scissors className="w-3.5 h-3.5" />
-                            <span>Open in Slicer</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNavigate('video');
-                            }}
-                            className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <Film className="w-3.5 h-3.5" />
-                            <span>Make Video</span>
-                          </button>
-                        </div>
-
-                        {/* Arrow indicator */}
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1.5 w-3 h-3 bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700/80 rotate-45 transform" />
-                      </div>
-                    )}
-
-                    {/* Primary Card View */}
-                    <div className="flex items-start justify-between gap-3 mb-2.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="p-2 rounded-xl bg-violet-50 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400 shrink-0">
-                          <FileArchive className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-xs text-slate-900 dark:text-white truncate">
-                            {item.filename}
-                          </h4>
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {new Date(item.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 shrink-0 font-medium">
-                        Saved
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {recentExports.slice(0, 6).map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        {item.count} Slices
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(item.timestamp).toLocaleDateString()}
                       </span>
                     </div>
 
-                    {/* Inline Mini-Thumbnails Strip & Slices Tag */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[10px] font-mono text-slate-400">
-                      <div className="flex items-center gap-1.5">
-                        {item.thumbnails && item.thumbnails.length > 0 ? (
-                          <div className="flex -space-x-1.5 overflow-hidden">
-                            {item.thumbnails.slice(0, 4).map((thumb, idx) => (
-                              <img
-                                key={idx}
-                                src={thumb}
-                                alt=""
-                                className="inline-block w-6 h-6 rounded-md object-cover ring-1 ring-white dark:ring-slate-900 shadow-2xs"
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <LayoutGrid className="w-3.5 h-3.5 text-slate-400" />
-                        )}
-                        <span className="font-medium text-slate-600 dark:text-slate-300">
-                          {item.count} slices
-                        </span>
-                        {item.rows && item.columns && (
-                          <span className="text-slate-400">({item.rows}×{item.columns})</span>
-                        )}
+                    {item.previewThumb ? (
+                      <div className="h-28 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+                        <img
+                          src={item.previewThumb}
+                          alt={item.filename}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
+                    ) : (
+                      <div className="h-28 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                        <ImageIcon className="w-6 h-6 opacity-40" />
+                      </div>
+                    )}
 
-                      <div className="flex items-center gap-1 text-violet-600 dark:text-violet-400 group-hover:underline">
-                        <Eye className="w-3 h-3" />
-                        <span>Hover Preview</span>
-                      </div>
-                    </div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      {item.filename}
+                    </h4>
                   </div>
-                );
-              })}
+
+                  {item.zipBlob && (
+                    <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                      <a
+                        href={URL.createObjectURL(item.zipBlob)}
+                        download={item.filename.replace(/\.[^/.]+$/, '') + '_slices.zip'}
+                        className="text-xs font-semibold text-[#E05D26] hover:underline flex items-center gap-1"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download ZIP</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          </div>
+          </section>
+        ) : (
+          <section className="border-t border-slate-200 dark:border-slate-800 pt-8 text-center py-6">
+            <p className="text-xs text-slate-400">
+              No recent exports yet. Drop any photo above to start your first project!
+            </p>
+          </section>
         )}
       </main>
 
-      {/* Footer strictly with "VistaroAI by SOLITA SOLUTIONS" */}
-      <Footer onNavigate={onNavigate} />
+      {/* Footer strictly with "VistaroAI by SOLITA SOLUTIONS" and Admin Control */}
+      <Footer onNavigate={onNavigate} onOpenAdminPanel={onOpenAdminPanel} />
     </div>
   );
 };

@@ -72,6 +72,7 @@ interface MotionVideoStudioProps {
   onNavigate: (view: 'home' | 'dashboard' | 'slicer' | 'video') => void;
   existingPanels?: PanelSlice[];
   onToast: (title: string, desc?: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
+  onOpenAdminPanel?: () => void;
 }
 
 export const MotionVideoStudio: React.FC<MotionVideoStudioProps> = ({
@@ -79,6 +80,7 @@ export const MotionVideoStudio: React.FC<MotionVideoStudioProps> = ({
   onNavigate,
   existingPanels = [],
   onToast,
+  onOpenAdminPanel,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -900,7 +902,7 @@ export const MotionVideoStudio: React.FC<MotionVideoStudioProps> = ({
       )}
 
       {/* Footer strictly with "VistaroAI by SOLITA SOLUTIONS" */}
-      <Footer onNavigate={onNavigate} />
+      <Footer onNavigate={onNavigate} onOpenAdminPanel={onOpenAdminPanel} />
     </div>
   );
 };
