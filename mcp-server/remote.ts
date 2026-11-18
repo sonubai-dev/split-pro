@@ -30,24 +30,34 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Optional API Key Authentication Middleware
+// API Key Authentication Middleware (Environment API_KEY or User Key vst_live_...)
 const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  if (!API_KEY) {
-    return next(); // Open development mode
-  }
-
   const authHeader = req.headers.authorization;
-  const customHeader = req.headers['x-vistaro-key'];
+  const customHeader = req.headers['x-vistaro-key'] as string | undefined;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : customHeader;
 
-  if (token === API_KEY) {
+  // 1. If explicit API_KEY is set in environment, check exact match
+  if (API_KEY) {
+    if (token === API_KEY || (token && /^vst_live_[a-f0-9]{32,}$/i.test(token))) {
+      return next();
+    }
+    res.status(401).json({
+      success: false,
+      error: 'Unauthorized',
+      message: 'Invalid or missing Vistaro API Key in Authorization header or X-Vistaro-Key.',
+    });
+    return;
+  }
+
+  // 2. Open development mode: allow requests, and validate token format if provided
+  if (!token || /^vst_live_[a-f0-9]{32,}$/i.test(token)) {
     return next();
   }
 
   res.status(401).json({
     success: false,
     error: 'Unauthorized',
-    message: 'Invalid or missing Vistaro API Key in Authorization header or X-Vistaro-Key.',
+    message: 'Malformed Vistaro API Key. Expected format: vst_live_<hex_token>',
   });
 };
 

@@ -24,6 +24,11 @@ import {
   PlayCircle,
   HelpCircle,
   Cpu,
+  Key,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Lock,
 } from 'lucide-react';
 import {
   getAgentState,
@@ -42,6 +47,7 @@ import {
 } from '../agent/tools';
 import { AgentAccessState, ToolName } from '../agent/types';
 import { getCyberpunkStoryboardSample } from '../lib/sampleArtGenerator';
+import { auth, saveUserApiKey, getUserApiKey, revokeUserApiKey } from '../lib/firebase';
 
 interface AgentDrawerProps {
   isOpen: boolean;
@@ -73,6 +79,67 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const [isMcpLive, setIsMcpLive] = useState(false);
+
+  // Agent API Key state
+  const [apiKey, setApiKey] = useState<string | null>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('vistaro_agent_api_key') : null;
+  });
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
+
+  // Load API key from Firebase if logged in
+  useEffect(() => {
+    if (!isOpen) return;
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      getUserApiKey(currentUser.uid).then((remoteKey) => {
+        if (remoteKey) {
+          setApiKey(remoteKey);
+          localStorage.setItem('vistaro_agent_api_key', remoteKey);
+        }
+      });
+    }
+  }, [isOpen]);
+
+  const handleGenerateApiKey = async () => {
+    try {
+      setIsGeneratingKey(true);
+      const randomBytes = new Uint8Array(24);
+      window.crypto.getRandomValues(randomBytes);
+      const hex = Array.from(randomBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+      const newKey = `vst_live_${hex}`;
+
+      setApiKey(newKey);
+      localStorage.setItem('vistaro_agent_api_key', newKey);
+
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await saveUserApiKey(currentUser.uid, newKey);
+      }
+
+      await navigator.clipboard.writeText(newKey);
+      onToast('Agent API Key Generated', 'Your new key has been copied to your clipboard.', 'success');
+    } catch (err) {
+      console.error('Failed to generate API key:', err);
+      onToast('Generation Error', 'Failed to generate key.', 'error');
+    } finally {
+      setIsGeneratingKey(false);
+    }
+  };
+
+  const handleRevokeApiKey = async () => {
+    try {
+      setApiKey(null);
+      localStorage.removeItem('vistaro_agent_api_key');
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await revokeUserApiKey(currentUser.uid);
+      }
+      onToast('API Key Revoked', 'Your agent key has been revoked and removed.', 'info');
+    } catch (err) {
+      console.error('Failed to revoke API key:', err);
+    }
+  };
 
   // Subscribe to agent state changes
   useEffect(() => {
@@ -579,6 +646,112 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-black/10 dark:bg-white/10">
                 Port 3001 / 3002
               </span>
+            </div>
+
+            {/* Agent API Key & Credentials Card */}
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F131C] space-y-3.5 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-[#E05D26]/10 text-[#E05D26] flex items-center justify-center font-bold text-xs">
+                    <Key className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>Agent API Key & Credentials</span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-normal">
+                        {auth.currentUser ? 'Firebase Cloud Synced' : 'Local Dev Mode'}
+                      </span>
+                    </h3>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Authenticate external AI agents, Claude Desktop, and ChatGPT Actions
+                    </p>
+                  </div>
+                </div>
+
+                {!apiKey ? (
+                  <button
+                    type="button"
+                    onClick={handleGenerateApiKey}
+                    disabled={isGeneratingKey}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#E05D26] hover:bg-[#C94E1B] active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    <span>{isGeneratingKey ? 'Generating...' : 'Generate Key'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleGenerateApiKey}
+                    className="text-[11px] font-medium text-slate-500 hover:text-[#E05D26] transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Generate a new key"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Regenerate</span>
+                  </button>
+                )}
+              </div>
+
+              {apiKey ? (
+                <div className="space-y-2 pt-1">
+                  {/* Key Display Bar */}
+                  <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono text-xs">
+                    <span className="truncate text-slate-800 dark:text-slate-200 tracking-wide select-all">
+                      {showApiKey
+                        ? apiKey
+                        : `${apiKey.slice(0, 10)}••••••••••••••••${apiKey.slice(-4)}`}
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="p-1.5 rounded text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                        title={showApiKey ? 'Hide API Key' : 'Reveal API Key'}
+                      >
+                        {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyToClipboard(apiKey, 'Agent API Key', 'API Key Copied to Clipboard')
+                        }
+                        className="p-1.5 rounded text-slate-500 hover:text-[#E05D26] transition-colors cursor-pointer"
+                        title="Copy API Key"
+                      >
+                        {copiedType === 'Agent API Key' ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRevokeApiKey}
+                        className="p-1.5 rounded text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                        title="Revoke and delete this key"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Integration Snippet */}
+                  <div className="p-2.5 rounded-lg bg-slate-100/60 dark:bg-slate-900/60 text-[11px] font-mono text-slate-600 dark:text-slate-400 space-y-1">
+                    <p className="font-semibold text-slate-700 dark:text-slate-300">
+                      HTTP Request Header:
+                    </p>
+                    <code className="block select-all text-emerald-600 dark:text-emerald-400">
+                      Authorization: Bearer {apiKey.slice(0, 12)}...
+                    </code>
+                    <p className="text-[10px] text-slate-500 pt-0.5">
+                      Or pass <span className="font-mono">X-Vistaro-Key</span> in webhooks and custom agent wrappers.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 text-center">
+                  No active API key. Click <strong>Generate Key</strong> to produce a secure token for Claude, ChatGPT Custom GPTs, or LangChain agents.
+                </div>
+              )}
             </div>
 
             {/* Quick Setup 1: ChatGPT Custom GPT Action */}

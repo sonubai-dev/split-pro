@@ -217,3 +217,52 @@ export async function getUserExportHistory(userId: string) {
 export async function resetPassword(email: string) {
   return sendPasswordResetEmail(auth, email);
 }
+
+/**
+ * Save or update user's Agent API Key in Firestore
+ */
+export async function saveUserApiKey(userId: string, key: string, name = 'Default Agent Key') {
+  if (!userId) return;
+  try {
+    const keyRef = doc(db, 'users', userId, 'apiKeys', 'default');
+    await setDoc(keyRef, {
+      key,
+      name,
+      createdAt: serverTimestamp(),
+      lastUsedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Could not save API key to Firestore:', err);
+  }
+}
+
+/**
+ * Retrieve user's Agent API Key from Firestore
+ */
+export async function getUserApiKey(userId: string): Promise<string | null> {
+  if (!userId) return null;
+  try {
+    const keyRef = doc(db, 'users', userId, 'apiKeys', 'default');
+    const snap = await getDoc(keyRef);
+    if (snap.exists()) {
+      return snap.data()?.key || null;
+    }
+  } catch (err) {
+    console.warn('Could not fetch API key from Firestore:', err);
+  }
+  return null;
+}
+
+/**
+ * Revoke/delete user's Agent API Key from Firestore
+ */
+export async function revokeUserApiKey(userId: string) {
+  if (!userId) return;
+  try {
+    const keyRef = doc(db, 'users', userId, 'apiKeys', 'default');
+    await deleteDoc(keyRef);
+  } catch (err) {
+    console.warn('Could not revoke API key from Firestore:', err);
+  }
+}
+
