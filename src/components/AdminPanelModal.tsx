@@ -202,7 +202,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [newTokenRateLimit, setNewTokenRateLimit] = useState(300);
 
   // Admin Login State (Security Gate)
-  const [adminEmail, setAdminEmail] = useState(SUPER_ADMIN_EMAIL);
+  const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -378,7 +378,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         body: JSON.stringify({
           name: newTokenName,
           rateLimitPerMin: newTokenRateLimit,
-          userEmail: SUPER_ADMIN_EMAIL,
+          userEmail: currentUser?.email || 'admin@vistaro',
         }),
       });
       if (res.ok) {
@@ -421,7 +421,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setIsLoggingIn(true);
     try {
       await onSignInEmail(adminEmail, adminPassword);
-      onToast('Super Admin Authenticated', `Welcome back, ${adminEmail}`, 'success');
+      onToast('Super Admin Authenticated', 'Administrative authority unlocked', 'success');
       setAdminPassword('');
     } catch (err: any) {
       onToast('Authentication Alert', err?.message || 'Invalid administrative credentials.', 'error');
@@ -481,7 +481,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       >
         {/* ========================================================================= */}
         {/* VIEW 1: ZERO-TRUST SUPER ADMIN SECURITY GATE (LOCKED VIEW)                */}
-        {/* Displayed whenever currentUser is NOT verified ssdd747346@gmail.com       */}
+        {/* Displayed whenever currentUser is NOT verified Super Admin                */}
         {/* ========================================================================= */}
         {!isAdmin ? (
           <div className="flex flex-col">
@@ -527,12 +527,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <form onSubmit={handleAdminSignIn} className="space-y-4 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40">
                 <div>
                   <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                    Designated Super Admin Email
+                    Super Admin Email
                   </label>
                   <input
                     type="email"
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
+                    placeholder="admin@domain.com"
+                    autoComplete="username"
                     className="w-full px-3 py-2 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:border-[#E05D26] font-mono transition-colors"
                     required
                   />
@@ -586,7 +588,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         ) : (
           /* ========================================================================= */
           /* VIEW 2: UNLOCKED SUPER ADMIN CONSOLE                                      */
-          /* Displayed strictly when currentUser.email === ssdd747346@gmail.com        */
+          /* Displayed strictly when currentUser is verified Super Admin               */
           /* ========================================================================= */
           <div className="flex flex-col h-full overflow-hidden">
             {/* Header */}
@@ -606,7 +608,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     </span>
                   </div>
                   <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                    Active Identity: {SUPER_ADMIN_EMAIL}
+                    Active Identity: System Root Admin (Protected)
                   </p>
                 </div>
               </div>
@@ -723,8 +725,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px] font-mono text-slate-600 dark:text-slate-400">
                       <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
-                        <span>• Super Admin:</span>
-                        <span className="text-[#E05D26] font-semibold">{SUPER_ADMIN_EMAIL}</span>
+                        <span>• Authority:</span>
+                        <span className="text-[#E05D26] font-semibold">Super Administrator (Root)</span>
                       </div>
                       <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
                         <span>• Status:</span>

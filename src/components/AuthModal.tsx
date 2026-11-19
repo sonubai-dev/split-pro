@@ -262,20 +262,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             )}
 
-            {mode === 'signin' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('ssdd747346@gmail.com');
-                  onToast('Admin Email Pre-filled', 'Enter your password to sign in as Super Admin', 'info');
-                }}
-                className="w-full py-1.5 px-3 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-[11px] font-medium hover:bg-amber-100 dark:hover:bg-amber-950/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-                <span>Quick Fill Admin Email</span>
-              </button>
-            )}
-
             <button
               type="submit"
               disabled={isLoading}

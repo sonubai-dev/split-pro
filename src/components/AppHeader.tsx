@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { subscribeMcpBridgeStatus } from '../agent/tools';
+import { isUserSuperAdmin } from '../lib/firebase';
 import {
   Scissors,
   Moon,
@@ -74,7 +75,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     return subscribeMcpBridgeStatus((live) => setIsMcpBridgeLive(live));
   }, []);
 
-  const isSuperAdmin = user?.email?.toLowerCase() === 'ssdd747346@gmail.com' || user?.role === 'super_admin' || user?.role === 'admin';
+  const isSuperAdmin = isUserSuperAdmin(user) || user?.role === 'super_admin' || user?.role === 'admin';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#0B0E14]/95 backdrop-blur-md text-slate-800 dark:text-slate-100 select-none transition-colors">

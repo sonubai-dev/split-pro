@@ -12,7 +12,7 @@ const app = express();
 const PORT = parseInt(process.env.PORT || process.env.VISTARO_REMOTE_PORT || '3002', 10);
 const API_KEY = process.env.VISTARO_API_KEY;
 const ADMIN_SECRET = process.env.VISTARO_ADMIN_SECRET || '__vistaro_dev_secret_do_not_use_in_prod__';
-const ADMIN_EMAIL = 'ssdd747346@gmail.com';
+const ADMIN_EMAIL = process.env.VISTARO_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'ssdd747346@gmail.com';
 
 // Max clock skew allowed for HMAC timestamp validation (5 minutes)
 const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000;
@@ -315,8 +315,8 @@ export interface AdminManagedUser {
 
 let managedUsers: AdminManagedUser[] = [
   {
-    uid: 'admin_ssdd747346',
-    email: 'ssdd747346@gmail.com',
+    uid: 'admin_root_01',
+    email: ADMIN_EMAIL,
     displayName: 'Super Admin',
     role: 'super_admin',
     status: 'active',
@@ -361,8 +361,8 @@ let managedTokens: ManagedToken[] = [
   {
     token: 'vst_live_master_admin_9938a1b2c3d4e5f6',
     name: 'Super Admin Master Token',
-    userId: 'admin_ssdd747346',
-    userEmail: 'ssdd747346@gmail.com',
+    userId: 'admin_root_01',
+    userEmail: ADMIN_EMAIL,
     createdAt: new Date().toISOString(),
     status: 'active',
     rateLimitPerMin: 1000,
@@ -371,8 +371,8 @@ let managedTokens: ManagedToken[] = [
   {
     token: 'vst_live_claude_desktop_bridge_849201f',
     name: 'Claude Desktop Integration',
-    userId: 'admin_ssdd747346',
-    userEmail: 'ssdd747346@gmail.com',
+    userId: 'admin_root_01',
+    userEmail: ADMIN_EMAIL,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
     status: 'active',
     rateLimitPerMin: 120,
@@ -418,7 +418,7 @@ const adminAuthMiddleware = (req: Request, res: Response, next: NextFunction) =>
     res.status(403).json({
       success: false,
       error: 'Forbidden',
-      message: 'Super Admin credentials required (ssdd747346@gmail.com). Missing Bearer token.',
+      message: 'Super Admin credentials required. Missing Bearer token.',
     });
     return;
   }
@@ -486,7 +486,7 @@ const adminAuthMiddleware = (req: Request, res: Response, next: NextFunction) =>
   res.status(403).json({
     success: false,
     error: 'Forbidden',
-    message: 'Super Admin privileges required (ssdd747346@gmail.com). Invalid or expired authorization.',
+    message: 'Super Admin privileges required. Invalid or expired authorization.',
   });
 };
 

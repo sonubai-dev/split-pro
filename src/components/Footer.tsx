@@ -71,7 +71,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenAdminPanel }) 
                 type="button"
                 onClick={onOpenAdminPanel}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 font-medium"
-                title="Super Admin Control (ssdd747346@gmail.com)"
+                title="Admin Control Console"
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
                 <span>Admin</span>
