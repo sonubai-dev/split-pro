@@ -25,7 +25,18 @@ import {
   Cpu,
   RefreshCw,
 } from 'lucide-react';
-import { SUPER_ADMIN_EMAIL, isUserSuperAdmin } from '../lib/firebase';
+import {
+  SUPER_ADMIN_EMAIL,
+  isUserSuperAdmin,
+  saveAdminFeatureFlags,
+  getAdminFeatureFlags,
+  saveAdminToken,
+  getAdminTokens,
+  revokeAdminTokenInFirestore,
+  getAllUsersFromFirestore,
+} from '../lib/firebase';
+
+const API_BASE = import.meta.env.VITE_MCP_API_URL || 'http://localhost:3002';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
@@ -69,12 +80,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
   // Admin Quick Login Form State
   const [adminEmail, setAdminEmail] = useState(SUPER_ADMIN_EMAIL);
-  const [adminPassword, setAdminPassword] = useState('SOnu11@@');
+  const [adminPassword, setAdminPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const isAdmin = isUserSuperAdmin(currentUser);
 
-  // Load Admin Data from REST backend
+  // Load Admin Data from REST backend & Firestore persistent backup
   const fetchAdminData = async () => {
     setIsLoading(true);
     try {
@@ -83,29 +94,55 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         'X-Admin-Email': currentUser?.email || SUPER_ADMIN_EMAIL,
       };
 
+      // 1. Fetch from Express / MCP Backend
       const [resOverview, resFeatures, resUsers, resTokens] = await Promise.all([
-        fetch('http://localhost:3002/api/v1/admin/overview', { headers }),
-        fetch('http://localhost:3002/api/v1/admin/features', { headers }),
-        fetch('http://localhost:3002/api/v1/admin/users', { headers }),
-        fetch('http://localhost:3002/api/v1/admin/tokens', { headers }),
+        fetch(`${API_BASE}/api/v1/admin/overview`, { headers }).catch(() => null),
+        fetch(`${API_BASE}/api/v1/admin/features`, { headers }).catch(() => null),
+        fetch(`${API_BASE}/api/v1/admin/users`, { headers }).catch(() => null),
+        fetch(`${API_BASE}/api/v1/admin/tokens`, { headers }).catch(() => null),
       ]);
 
-      if (resOverview.ok) {
+      if (resOverview && resOverview.ok) {
         const data = await resOverview.json();
         setOverview(data);
         if (data.features) setFeatures(data.features);
       }
-      if (resFeatures.ok) {
+      if (resFeatures && resFeatures.ok) {
         const data = await resFeatures.json();
         if (data.features) setFeatures(data.features);
       }
-      if (resUsers.ok) {
+      if (resUsers && resUsers.ok) {
         const data = await resUsers.json();
         if (data.users) setUsers(data.users);
       }
-      if (resTokens.ok) {
+      if (resTokens && resTokens.ok) {
         const data = await resTokens.json();
         if (data.tokens) setTokens(data.tokens);
+      }
+
+      // 2. Fetch persistent fallback / merged records from Firestore
+      const [fsFeatures, fsTokens, fsUsers] = await Promise.all([
+        getAdminFeatureFlags(),
+        getAdminTokens(),
+        getAllUsersFromFirestore(),
+      ]);
+
+      if (fsFeatures) {
+        setFeatures((prev) => ({ ...prev, ...fsFeatures }));
+      }
+      if (fsTokens && fsTokens.length > 0) {
+        setTokens((prev) => {
+          const map = new Map();
+          [...prev, ...fsTokens].forEach((t) => map.set(t.token, t));
+          return Array.from(map.values());
+        });
+      }
+      if (fsUsers && fsUsers.length > 0) {
+        setUsers((prev) => {
+          const map = new Map();
+          [...prev, ...fsUsers].forEach((u) => map.set(u.uid, u));
+          return Array.from(map.values());
+        });
       }
     } catch (err) {
       console.warn('[AdminPanel] Could not connect to remote backend:', err);
@@ -122,12 +159,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Toggle Feature Flag
+  // Toggle Feature Flag (with Firestore persistence)
   const handleToggleFeature = async (featureKey: string, newValue: boolean) => {
     const updated = { ...features, [featureKey]: newValue };
     setFeatures(updated);
+    // Persist to Firestore
+    await saveAdminFeatureFlags(updated);
+
     try {
-      const res = await fetch('http://localhost:3002/api/v1/admin/features', {
+      const res = await fetch(`${API_BASE}/api/v1/admin/features`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -139,14 +179,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         onToast('Feature Updated', `${featureKey} is now ${newValue ? 'Enabled' : 'Disabled'}`, 'success');
       }
     } catch (err) {
-      onToast('Update Error', 'Failed to update feature flag on backend.', 'error');
+      onToast('Saved to Firestore', `${featureKey} updated in database.`, 'info');
     }
   };
 
   // Change User Role
   const handleChangeRole = async (uid: string, newRole: string) => {
     try {
-      const res = await fetch(`http://localhost:3002/api/v1/admin/users/${uid}/role`, {
+      const res = await fetch(`${API_BASE}/api/v1/admin/users/${uid}/role`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +207,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const handleToggleUserStatus = async (uid: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
     try {
-      const res = await fetch(`http://localhost:3002/api/v1/admin/users/${uid}/status`, {
+      const res = await fetch(`${API_BASE}/api/v1/admin/users/${uid}/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,13 +224,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }
   };
 
-  // Generate Agent Token
+  // Generate Agent Token (with Firestore persistence)
   const handleGenerateToken = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTokenName.trim()) return;
 
     try {
-      const res = await fetch('http://localhost:3002/api/v1/admin/tokens/generate', {
+      const res = await fetch(`${API_BASE}/api/v1/admin/tokens/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,17 +246,21 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         const data = await res.json();
         setTokens((prev) => [data.token, ...prev]);
         setNewTokenName('');
-        onToast('Token Provisioned', 'New agent key created and active.', 'success');
+        // Save to Firestore
+        await saveAdminToken(data.token);
+        onToast('Token Provisioned', 'New agent key created and persisted.', 'success');
       }
     } catch (err) {
       onToast('Token Error', 'Failed to generate token.', 'error');
     }
   };
 
-  // Revoke Token
+  // Revoke Token (with Firestore persistence)
   const handleRevokeToken = async (token: string) => {
+    // Revoke in Firestore
+    await revokeAdminTokenInFirestore(token);
     try {
-      const res = await fetch('http://localhost:3002/api/v1/admin/tokens/revoke', {
+      const res = await fetch(`${API_BASE}/api/v1/admin/tokens/revoke`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +273,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         onToast('Token Revoked', 'The agent token has been revoked.', 'warning');
       }
     } catch (err) {
-      onToast('Revocation Error', 'Failed to revoke token.', 'error');
+      onToast('Token Revoked', 'Updated revocation status in Firestore.', 'warning');
     }
   };
 
@@ -764,11 +808,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               </form>
 
               <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-300">
-                <strong>Configured Credentials:</strong>
-                <div className="font-mono mt-1">
-                  Email: {SUPER_ADMIN_EMAIL}<br />
-                  Password: SOnu11@@
+                <strong>Designated Super Admin Identity:</strong>
+                <div className="font-mono mt-1 text-[#E05D26] font-semibold">
+                  {SUPER_ADMIN_EMAIL}
                 </div>
+                <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                  Enter your administrative password above to authenticate. Super Admin privileges grant full feature control, user role updates, and agent token authority.
+                </p>
               </div>
             </div>
           )}

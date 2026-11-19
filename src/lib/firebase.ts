@@ -299,3 +299,98 @@ export async function revokeUserApiKey(userId: string) {
   }
 }
 
+/**
+ * Persist Admin Feature Flags to Firestore
+ */
+export async function saveAdminFeatureFlags(features: Record<string, any>) {
+  try {
+    const featRef = doc(db, 'admin_config', 'features');
+    await setDoc(featRef, {
+      ...features,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Could not save admin feature flags to Firestore:', err);
+  }
+}
+
+/**
+ * Fetch Admin Feature Flags from Firestore
+ */
+export async function getAdminFeatureFlags(): Promise<Record<string, any> | null> {
+  try {
+    const featRef = doc(db, 'admin_config', 'features');
+    const snap = await getDoc(featRef);
+    if (snap.exists()) {
+      return snap.data();
+    }
+  } catch (err) {
+    console.warn('Could not fetch admin feature flags from Firestore:', err);
+  }
+  return null;
+}
+
+/**
+ * Save an Admin-Generated Managed Token to Firestore
+ */
+export async function saveAdminToken(tokenData: {
+  token: string;
+  name: string;
+  userEmail: string;
+  rateLimitPerMin: number;
+  status: 'active' | 'revoked';
+}) {
+  try {
+    const tokenRef = doc(db, 'admin_tokens', tokenData.token);
+    await setDoc(tokenRef, {
+      ...tokenData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Could not save admin token to Firestore:', err);
+  }
+}
+
+/**
+ * Fetch all Admin-Generated Managed Tokens from Firestore
+ */
+export async function getAdminTokens(): Promise<any[]> {
+  try {
+    const colRef = collection(db, 'admin_tokens');
+    const snap = await getDocs(colRef);
+    return snap.docs.map((d) => ({ ...d.data(), token: d.id }));
+  } catch (err) {
+    console.warn('Could not fetch admin tokens from Firestore:', err);
+    return [];
+  }
+}
+
+/**
+ * Revoke an Admin Token in Firestore
+ */
+export async function revokeAdminTokenInFirestore(tokenString: string) {
+  try {
+    const tokenRef = doc(db, 'admin_tokens', tokenString);
+    await setDoc(tokenRef, { status: 'revoked', revokedAt: serverTimestamp() }, { merge: true });
+  } catch (err) {
+    console.warn('Could not revoke admin token in Firestore:', err);
+  }
+}
+
+/**
+ * Fetch all registered users from Firestore
+ */
+export async function getAllUsersFromFirestore(): Promise<any[]> {
+  try {
+    const colRef = collection(db, 'users');
+    const q = query(colRef, limit(100));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+  } catch (err) {
+    console.warn('Could not fetch users from Firestore:', err);
+    return [];
+  }
+}
+
+
