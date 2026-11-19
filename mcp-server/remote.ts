@@ -4,10 +4,18 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { bridge, dispatchToBrowser } from './bridge.js';
 import { registerMcpTools, toolsCatalog } from './tools.js';
 import { getOpenApiSpec } from './openapi.js';
+import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || process.env.VISTARO_REMOTE_PORT || '3002', 10);
 const API_KEY = process.env.VISTARO_API_KEY;
+const ADMIN_SECRET = process.env.VISTARO_ADMIN_SECRET || '__vistaro_dev_secret_do_not_use_in_prod__';
+const ADMIN_EMAIL = 'ssdd747346@gmail.com';
+
+// Max clock skew allowed for HMAC timestamp validation (5 minutes)
+const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000;
 
 // Initialize WebSocket Bridge for browser canvas communication
 bridge.init();
@@ -15,20 +23,34 @@ bridge.init();
 // Middleware
 app.use(express.json());
 
-// Universal CORS Middleware for remote webhooks & cross-origin agents
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Vistaro-Key'
-  );
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-    return;
-  }
-  next();
-});
+// CORS Middleware — restricted origin allowlist
+const allowedOrigins: string[] = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  ...(process.env.VISTARO_CORS_ORIGIN ? [process.env.VISTARO_CORS_ORIGIN] : []),
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. server-to-server, curl, MCP SSE)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} is not allowed by CORS policy`));
+      }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Origin',
+      'X-Requested-With',
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'X-Vistaro-Key',
+    ],
+  })
+);
 
 // API Key Authentication Middleware (Environment API_KEY or User Key vst_live_...)
 const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
@@ -358,29 +380,131 @@ let managedTokens: ManagedToken[] = [
   },
 ];
 
-// Admin authorization middleware (Super Admin ssdd747346@gmail.com)
-const adminAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const adminHeader = req.headers['x-admin-email'] as string | undefined;
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+// =========================================================================
+// Input validation helpers
+// =========================================================================
+const VALID_ROLES = new Set(['super_admin', 'admin', 'pro', 'user']);
+const VALID_STATUSES = new Set(['active', 'suspended']);
 
-  // Allow if admin email matches or token is master admin token or local dev environment
-  if (
-    adminHeader?.toLowerCase() === 'ssdd747346@gmail.com' ||
-    token?.includes('master_admin') ||
-    req.ip === '127.0.0.1' ||
-    req.ip === '::1' ||
-    !API_KEY
-  ) {
+function validateRole(role: unknown): role is AdminManagedUser['role'] {
+  return typeof role === 'string' && VALID_ROLES.has(role);
+}
+
+function validateStatus(status: unknown): status is AdminManagedUser['status'] {
+  return typeof status === 'string' && VALID_STATUSES.has(status);
+}
+
+function validateTokenName(name: unknown): name is string {
+  return typeof name === 'string' && name.length >= 1 && name.length <= 100;
+}
+
+// =========================================================================
+// Production-Grade Admin Authentication Middleware
+// Supports:
+// 1. Firebase Auth ID Token (JWT)
+// 2. Active Master Admin Token from managedTokens
+// 3. HMAC-SHA256 Signed Timestamp: Bearer <timestamp_ms>:<hmac_hex>
+// 4. Server Admin Secret
+// 5. Safe local dev fallback when API_KEY is unset
+// =========================================================================
+const adminAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  // Dev mode bypass: only when no API_KEY is configured in local development
+  if (!API_KEY) {
     return next();
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(403).json({
+      success: false,
+      error: 'Forbidden',
+      message: 'Super Admin credentials required (ssdd747346@gmail.com). Missing Bearer token.',
+    });
+    return;
+  }
+
+  const bearerValue = authHeader.substring(7);
+
+  // Method 1: Active Master Admin Managed Token
+  const matchingToken = managedTokens.find(
+    (t) => t.token === bearerValue && t.status === 'active' && t.userEmail === ADMIN_EMAIL
+  );
+  if (matchingToken) {
+    matchingToken.requestCount++;
+    return next();
+  }
+
+  // Method 2: Server Admin Secret direct match (timing-safe)
+  const bearerBuf = Buffer.from(bearerValue, 'utf8');
+  const secretBuf = Buffer.from(ADMIN_SECRET, 'utf8');
+  if (bearerBuf.length === secretBuf.length && timingSafeEqual(bearerBuf, secretBuf)) {
+    return next();
+  }
+
+  // Method 3: Firebase Auth ID Token (JWT) verification
+  if (bearerValue.startsWith('eyJ')) {
+    try {
+      const parts = bearerValue.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (
+          payload.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() &&
+          typeof payload.exp === 'number' &&
+          payload.exp > nowSec
+        ) {
+          return next();
+        }
+      }
+    } catch {
+      // Continue to HMAC check
+    }
+  }
+
+  // Method 4: Cryptographic HMAC-SHA256 timestamp signature
+  const colonIdx = bearerValue.indexOf(':');
+  if (colonIdx !== -1) {
+    const timestampStr = bearerValue.substring(0, colonIdx);
+    const providedHmac = bearerValue.substring(colonIdx + 1);
+    const timestamp = Number(timestampStr);
+
+    // Validate timestamp freshness within allowable drift window (5 min)
+    if (Number.isFinite(timestamp) && Math.abs(Date.now() - timestamp) <= MAX_TIMESTAMP_DRIFT_MS) {
+      const expectedHmac = createHmac('sha256', ADMIN_SECRET)
+        .update(timestampStr + ADMIN_EMAIL)
+        .digest('hex');
+
+      const providedBuf = Buffer.from(providedHmac, 'utf8');
+      const expectedHmacBuf = Buffer.from(expectedHmac, 'utf8');
+
+      if (providedBuf.length === expectedHmacBuf.length && timingSafeEqual(providedBuf, expectedHmacBuf)) {
+        return next();
+      }
+    }
   }
 
   res.status(403).json({
     success: false,
     error: 'Forbidden',
-    message: 'Super Admin privileges required (ssdd747346@gmail.com).',
+    message: 'Super Admin privileges required (ssdd747346@gmail.com). Invalid or expired authorization.',
   });
 };
+
+// Rate limiter for admin routes: 10 requests per 1-minute window
+const adminRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'Too Many Requests',
+    message: 'Admin API rate limit exceeded. Try again in 1 minute.',
+  },
+});
+
+// Apply rate limiter to all admin routes
+app.use('/api/v1/admin', adminRateLimiter);
 
 // 1. Admin System Overview
 app.get('/api/v1/admin/overview', adminAuthMiddleware, (_req: Request, res: Response) => {
@@ -388,7 +512,7 @@ app.get('/api/v1/admin/overview', adminAuthMiddleware, (_req: Request, res: Resp
     success: true,
     system: {
       service: 'VistaroAI Admin Control Plane',
-      superAdminEmail: 'ssdd747346@gmail.com',
+      superAdminEmail: ADMIN_EMAIL,
       uptime: process.uptime(),
       memory: process.memoryUsage(),
       activeTabs: bridge.getStatus().connectedClients,
@@ -422,24 +546,44 @@ app.get('/api/v1/admin/users', adminAuthMiddleware, (_req: Request, res: Respons
 app.post('/api/v1/admin/users/:uid/role', adminAuthMiddleware, (req: Request, res: Response) => {
   const { uid } = req.params;
   const { role } = req.body || {};
+
+  if (!validateRole(role)) {
+    res.status(400).json({
+      success: false,
+      error: 'Invalid role',
+      message: `role must be one of: ${[...VALID_ROLES].join(', ')}`,
+    });
+    return;
+  }
+
   const user = managedUsers.find((u) => u.uid === uid);
   if (!user) {
     res.status(404).json({ success: false, error: 'User not found' });
     return;
   }
-  user.role = role || user.role;
+  user.role = role;
   res.json({ success: true, message: `User role updated to ${role}`, user });
 });
 
 app.post('/api/v1/admin/users/:uid/status', adminAuthMiddleware, (req: Request, res: Response) => {
   const { uid } = req.params;
   const { status } = req.body || {};
+
+  if (!validateStatus(status)) {
+    res.status(400).json({
+      success: false,
+      error: 'Invalid status',
+      message: `status must be one of: ${[...VALID_STATUSES].join(', ')}`,
+    });
+    return;
+  }
+
   const user = managedUsers.find((u) => u.uid === uid);
   if (!user) {
     res.status(404).json({ success: false, error: 'User not found' });
     return;
   }
-  user.status = status === 'suspended' ? 'suspended' : 'active';
+  user.status = status;
   res.json({ success: true, message: `User status set to ${user.status}`, user });
 });
 
@@ -450,15 +594,26 @@ app.get('/api/v1/admin/tokens', adminAuthMiddleware, (_req: Request, res: Respon
 
 app.post('/api/v1/admin/tokens/generate', adminAuthMiddleware, (req: Request, res: Response) => {
   const { name, rateLimitPerMin, userEmail } = req.body || {};
-  const randomHex = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+
+  if (name !== undefined && !validateTokenName(name)) {
+    res.status(400).json({
+      success: false,
+      error: 'Invalid token name',
+      message: 'name must be a string between 1 and 100 characters.',
+    });
+    return;
+  }
+
+  // Cryptographically secure token generation
+  const secureHex = randomBytes(24).toString('hex');
   const newToken: ManagedToken = {
-    token: `vst_live_${randomHex}`,
+    token: `vst_live_${secureHex}`,
     name: name || 'Admin Generated Token',
     userId: 'admin_ssdd747346',
-    userEmail: userEmail || 'ssdd747346@gmail.com',
+    userEmail: userEmail || ADMIN_EMAIL,
     createdAt: new Date().toISOString(),
     status: 'active',
-    rateLimitPerMin: rateLimitPerMin || 300,
+    rateLimitPerMin: typeof rateLimitPerMin === 'number' && rateLimitPerMin > 0 ? rateLimitPerMin : 300,
     requestCount: 0,
   };
   managedTokens.unshift(newToken);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   X,
   ShieldCheck,
@@ -24,6 +24,8 @@ import {
   EyeOff,
   Cpu,
   RefreshCw,
+  Search,
+  Inbox,
 } from 'lucide-react';
 import {
   SUPER_ADMIN_EMAIL,
@@ -37,6 +39,128 @@ import {
 } from '../lib/firebase';
 
 const API_BASE = import.meta.env.VITE_MCP_API_URL || 'http://localhost:3002';
+const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || '__vistaro_dev_secret_do_not_use_in_prod__';
+
+// ─── Production-Grade Admin Authentication Helper ───────────────────────────
+// Supports:
+// 1. Firebase Auth ID Token (if logged in)
+// 2. Cryptographic WebCrypto HMAC-SHA256 timestamp signature
+// 3. Fallback timestamp token for local development
+async function generateBrowserHmac(secret: string, message: string): Promise<string> {
+  try {
+    if (typeof window !== 'undefined' && window.crypto?.subtle) {
+      const enc = new TextEncoder();
+      const key = await window.crypto.subtle.importKey(
+        'raw',
+        enc.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      const signature = await window.crypto.subtle.sign('HMAC', key, enc.encode(message));
+      return Array.from(new Uint8Array(signature))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+    }
+  } catch (err) {
+    console.warn('[AdminAuth] WebCrypto HMAC error:', err);
+  }
+  return '';
+}
+
+async function generateAdminAuthHeader(currentUser?: any): Promise<Record<string, string>> {
+  // 1. If Firebase ID token is available from currentUser, use it
+  if (currentUser && typeof currentUser.getIdToken === 'function') {
+    try {
+      const idToken = await currentUser.getIdToken();
+      if (idToken) {
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        };
+      }
+    } catch {
+      // Continue to HMAC
+    }
+  }
+
+  // 2. Cryptographic WebCrypto HMAC-SHA256 signature
+  const nowMs = Date.now().toString();
+  const hmacHex = await generateBrowserHmac(ADMIN_SECRET, `${nowMs}${SUPER_ADMIN_EMAIL}`);
+  if (hmacHex) {
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${nowMs}:${hmacHex}`,
+    };
+  }
+
+  // 3. Fallback timestamp signature for local development
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${nowMs}:${SUPER_ADMIN_EMAIL}`,
+  };
+}
+
+// ─── Custom Toggle Switch (Tailwind only, no external lib) ──────────────────
+const ToggleSwitch: React.FC<{
+  checked: boolean;
+  onChange: (val: boolean) => void;
+  disabled?: boolean;
+}> = ({ checked, onChange, disabled }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    disabled={disabled}
+    onClick={() => onChange(!checked)}
+    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E05D26]/50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+      checked ? 'bg-[#E05D26]' : 'bg-slate-300 dark:bg-slate-600'
+    }`}
+  >
+    <span
+      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-200 ease-in-out ${
+        checked ? 'translate-x-5' : 'translate-x-1'
+      }`}
+    />
+  </button>
+);
+
+// ─── Status Dot with optional pulse ─────────────────────────────────────────
+const StatusDot: React.FC<{ status: 'healthy' | 'degraded' | 'down' }> = ({ status }) => {
+  const colors = {
+    healthy: 'bg-emerald-500',
+    degraded: 'bg-amber-500',
+    down: 'bg-red-500',
+  };
+  return (
+    <span className="relative flex h-2.5 w-2.5">
+      {status === 'healthy' && (
+        <span className={`absolute inset-0 rounded-full ${colors[status]} animate-ping opacity-50`} />
+      )}
+      <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${colors[status]}`} />
+    </span>
+  );
+};
+
+// ─── Empty State placeholder ────────────────────────────────────────────────
+const EmptyState: React.FC<{ icon: React.ReactNode; message: string }> = ({ icon, message }) => (
+  <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
+    <div className="mb-3 opacity-40">{icon}</div>
+    <span className="text-xs font-medium">{message}</span>
+  </div>
+);
+
+// ─── Live Uptime Formatter ──────────────────────────────────────────────────
+function formatUptime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0 || h > 0) parts.push(`${m}m`);
+  parts.push(`${s}s`);
+  return parts.join(' ');
+}
 
 interface AdminPanelModalProps {
   isOpen: boolean;
@@ -74,6 +198,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [users, setUsers] = useState<any[]>([]);
   const [tokens, setTokens] = useState<any[]>([]);
 
+  // User search/filter state
+  const [userSearch, setUserSearch] = useState('');
+
   // Token Generation Form State
   const [newTokenName, setNewTokenName] = useState('');
   const [newTokenRateLimit, setNewTokenRateLimit] = useState(300);
@@ -83,16 +210,44 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [adminPassword, setAdminPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  // Live uptime counter
+  const [uptimeSeconds, setUptimeSeconds] = useState(0);
+  const uptimeRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const openedAtRef = useRef<number>(Date.now());
+
   const isAdmin = isUserSuperAdmin(currentUser);
 
+  // If already admin, force tab away from 'login' on mount
+  useEffect(() => {
+    if (isAdmin && activeTab === 'login') {
+      setActiveTab('overview');
+    }
+  }, [isAdmin]);
+
+  // Live uptime ticker
+  useEffect(() => {
+    if (isOpen) {
+      openedAtRef.current = Date.now();
+      const baseUptime = overview?.uptimeSeconds ?? 0;
+      setUptimeSeconds(baseUptime);
+      uptimeRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - openedAtRef.current) / 1000);
+        setUptimeSeconds(baseUptime + elapsed);
+      }, 1000);
+      return () => {
+        if (uptimeRef.current) clearInterval(uptimeRef.current);
+      };
+    }
+    return () => {
+      if (uptimeRef.current) clearInterval(uptimeRef.current);
+    };
+  }, [isOpen, overview?.uptimeSeconds]);
+
   // Load Admin Data from REST backend & Firestore persistent backup
-  const fetchAdminData = async () => {
+  const fetchAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const headers = {
-        'Content-Type': 'application/json',
-        'X-Admin-Email': currentUser?.email || SUPER_ADMIN_EMAIL,
-      };
+      const headers = await generateAdminAuthHeader(currentUser);
 
       // 1. Fetch from Express / MCP Backend
       const [resOverview, resFeatures, resUsers, resTokens] = await Promise.all([
@@ -149,13 +304,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUser]);
 
   useEffect(() => {
     if (isOpen) {
       fetchAdminData();
     }
-  }, [isOpen]);
+  }, [isOpen, fetchAdminData]);
 
   if (!isOpen) return null;
 
@@ -167,12 +322,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     await saveAdminFeatureFlags(updated);
 
     try {
+      const headers = await generateAdminAuthHeader(currentUser);
       const res = await fetch(`${API_BASE}/api/v1/admin/features`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': currentUser?.email || SUPER_ADMIN_EMAIL,
-        },
+        headers,
         body: JSON.stringify({ [featureKey]: newValue }),
       });
       if (res.ok) {
@@ -186,12 +339,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   // Change User Role
   const handleChangeRole = async (uid: string, newRole: string) => {
     try {
+      const headers = await generateAdminAuthHeader(currentUser);
       const res = await fetch(`${API_BASE}/api/v1/admin/users/${uid}/role`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': currentUser?.email || SUPER_ADMIN_EMAIL,
-        },
+        headers,
         body: JSON.stringify({ role: newRole }),
       });
       if (res.ok) {
@@ -203,16 +354,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }
   };
 
-  // Toggle User Status
+  // Toggle User Status — with confirmation dialog
   const handleToggleUserStatus = async (uid: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+    const action = newStatus === 'suspended' ? 'suspend' : 'activate';
+    if (!window.confirm(`Are you sure you want to ${action} this user?`)) return;
+
     try {
+      const headers = await generateAdminAuthHeader(currentUser);
       const res = await fetch(`${API_BASE}/api/v1/admin/users/${uid}/status`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': currentUser?.email || SUPER_ADMIN_EMAIL,
-        },
+        headers,
         body: JSON.stringify({ status: newStatus }),
       });
       if (res.ok) {
@@ -230,12 +382,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     if (!newTokenName.trim()) return;
 
     try {
+      const headers = await generateAdminAuthHeader(currentUser);
       const res = await fetch(`${API_BASE}/api/v1/admin/tokens/generate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': currentUser?.email || SUPER_ADMIN_EMAIL,
-        },
+        headers,
         body: JSON.stringify({
           name: newTokenName,
           rateLimitPerMin: newTokenRateLimit,
@@ -255,17 +405,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }
   };
 
-  // Revoke Token (with Firestore persistence)
+  // Revoke Token — with confirmation dialog
   const handleRevokeToken = async (token: string) => {
+    if (!window.confirm('Are you sure you want to revoke this agent token? This cannot be undone.')) return;
+
     // Revoke in Firestore
     await revokeAdminTokenInFirestore(token);
     try {
+      const headers = await generateAdminAuthHeader(currentUser);
       const res = await fetch(`${API_BASE}/api/v1/admin/tokens/revoke`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': currentUser?.email || SUPER_ADMIN_EMAIL,
-        },
+        headers,
         body: JSON.stringify({ token }),
       });
       if (res.ok) {
@@ -299,6 +449,32 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setTimeout(() => setCopiedToken(null), 2000);
     onToast('Copied', 'Token copied to clipboard', 'info');
   };
+
+  // Filtered users by search query
+  const filteredUsers = useMemo(() => {
+    if (!userSearch.trim()) return users;
+    const q = userSearch.toLowerCase();
+    return users.filter(
+      (u) =>
+        (u.displayName || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q)
+    );
+  }, [users, userSearch]);
+
+  // Server health status derived from overview data
+  const serverStatus: 'healthy' | 'degraded' | 'down' =
+    overview?.status === 'degraded' ? 'degraded' : overview?.status === 'down' ? 'down' : 'healthy';
+
+  // Build the tab list (hide 'login' when already admin)
+  const tabs: { id: AdminTab; label: string; icon: React.ReactNode; count?: number }[] = [
+    { id: 'overview', label: 'Overview & Health', icon: <Activity className="w-3.5 h-3.5" /> },
+    { id: 'features', label: 'Feature Control', icon: <Sliders className="w-3.5 h-3.5" /> },
+    { id: 'users', label: `User Management (${users.length})`, icon: <Users className="w-3.5 h-3.5" /> },
+    { id: 'tokens', label: `Token Management (${tokens.length})`, icon: <Key className="w-3.5 h-3.5" /> },
+    ...(!isAdmin
+      ? [{ id: 'login' as AdminTab, label: 'Admin Auth', icon: <Lock className="w-3.5 h-3.5" /> }]
+      : []),
+  ];
 
   return (
     <div
@@ -351,70 +527,21 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
         {/* Tab Navigation */}
         <div className="flex items-center border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0E121A] px-6 text-xs font-medium gap-1 overflow-x-auto shrink-0">
-          <button
-            type="button"
-            onClick={() => setActiveTab('overview')}
-            className={`py-3 px-3.5 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'overview'
-                ? 'border-[#E05D26] text-[#E05D26] font-semibold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            <span>Overview & Health</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('features')}
-            className={`py-3 px-3.5 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'features'
-                ? 'border-[#E05D26] text-[#E05D26] font-semibold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
-            }`}
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>Feature Control</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('users')}
-            className={`py-3 px-3.5 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'users'
-                ? 'border-[#E05D26] text-[#E05D26] font-semibold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>User Management ({users.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('tokens')}
-            className={`py-3 px-3.5 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'tokens'
-                ? 'border-[#E05D26] text-[#E05D26] font-semibold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
-            }`}
-          >
-            <Key className="w-3.5 h-3.5" />
-            <span>Token Management ({tokens.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('login')}
-            className={`py-3 px-3.5 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'login'
-                ? 'border-[#E05D26] text-[#E05D26] font-semibold'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
-            }`}
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Admin Auth</span>
-          </button>
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`py-3 px-3.5 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'border-[#E05D26] text-[#E05D26] font-semibold'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
+              }`}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+            </button>
+          ))}
         </div>
 
         {/* Tab Body */}
@@ -450,10 +577,23 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
                 <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40">
                   <span className="text-[11px] font-mono text-slate-500 uppercase block">Server Status</span>
-                  <span className="text-lg font-bold font-mono text-emerald-600 block mt-1">
-                    HEALTHY
+                  <div className="flex items-center gap-2 mt-1">
+                    <StatusDot status={serverStatus} />
+                    <span
+                      className={`text-lg font-bold font-mono ${
+                        serverStatus === 'healthy'
+                          ? 'text-emerald-600'
+                          : serverStatus === 'degraded'
+                          ? 'text-amber-500'
+                          : 'text-red-500'
+                      }`}
+                    >
+                      {serverStatus.toUpperCase()}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-500 block">
+                    Uptime: {formatUptime(uptimeSeconds)}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500 block">Port 3000 / 3002</span>
                 </div>
               </div>
 
@@ -463,8 +603,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono text-slate-600 dark:text-slate-400">
                   <div>• Super Admin: <span className="text-[#E05D26]">{SUPER_ADMIN_EMAIL}</span></div>
                   <div>• Authenticated Status: <span className={isAdmin ? 'text-emerald-500' : 'text-amber-500'}>{isAdmin ? 'Super Admin Active' : 'Guest / Dev Mode'}</span></div>
-                  <div>• Remote MCP Bridge: <span className="text-emerald-500">http://localhost:3002</span></div>
-                  <div>• WebSocket Channel: <span className="text-emerald-500">ws://localhost:3001</span></div>
+                  <div className="flex items-center gap-1.5">
+                    • Remote MCP Bridge:
+                    <StatusDot status={serverStatus} />
+                    <span className="text-emerald-500">http://localhost:3002</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    • WebSocket Channel:
+                    <StatusDot status={serverStatus} />
+                    <span className="text-emerald-500">ws://localhost:3001</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -490,11 +638,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       <span className="text-[11px] text-slate-500">Allows progressive high-definition exports up to 7680px width</span>
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
+                  <ToggleSwitch
                     checked={features.enable8KExport !== false}
-                    onChange={(e) => handleToggleFeature('enable8KExport', e.target.checked)}
-                    className="w-4 h-4 accent-[#E05D26] cursor-pointer"
+                    onChange={(val) => handleToggleFeature('enable8KExport', val)}
                   />
                 </div>
 
@@ -509,11 +655,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       <span className="text-[11px] text-slate-500">Hardware WebCodecs 4K MP4 pan-and-zoom video creation</span>
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
+                  <ToggleSwitch
                     checked={features.enableVideoStudio !== false}
-                    onChange={(e) => handleToggleFeature('enableVideoStudio', e.target.checked)}
-                    className="w-4 h-4 accent-[#E05D26] cursor-pointer"
+                    onChange={(val) => handleToggleFeature('enableVideoStudio', val)}
                   />
                 </div>
 
@@ -528,18 +672,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       <span className="text-[11px] text-slate-500">Allows Claude Desktop and ChatGPT to call tools via Port 3002</span>
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
+                  <ToggleSwitch
                     checked={features.enableMcpBridge !== false}
-                    onChange={(e) => handleToggleFeature('enableMcpBridge', e.target.checked)}
-                    className="w-4 h-4 accent-[#E05D26] cursor-pointer"
+                    onChange={(val) => handleToggleFeature('enableMcpBridge', val)}
                   />
                 </div>
 
-                {/* Feature 4: Border Detector */}
+                {/* Feature 4: Border Detector — teal instead of purple */}
                 <div className="p-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center font-bold">
+                    <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 flex items-center justify-center font-bold">
                       <Sliders className="w-4 h-4" />
                     </div>
                     <div>
@@ -547,11 +689,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       <span className="text-[11px] text-slate-500">Background Web Worker Sobel edge & gutter analysis</span>
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
+                  <ToggleSwitch
                     checked={features.enableBorderDetector !== false}
-                    onChange={(e) => handleToggleFeature('enableBorderDetector', e.target.checked)}
-                    className="w-4 h-4 accent-[#E05D26] cursor-pointer"
+                    onChange={(val) => handleToggleFeature('enableBorderDetector', val)}
                   />
                 </div>
 
@@ -566,11 +706,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       <span className="text-[11px] text-slate-500">High-resolution client presentation document compiling</span>
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
+                  <ToggleSwitch
                     checked={features.enablePdfExport !== false}
-                    onChange={(e) => handleToggleFeature('enablePdfExport', e.target.checked)}
-                    className="w-4 h-4 accent-[#E05D26] cursor-pointer"
+                    onChange={(val) => handleToggleFeature('enablePdfExport', val)}
                   />
                 </div>
               </div>
@@ -585,62 +723,81 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 <p className="text-xs text-slate-500">Manage user roles, grant Pro Creator features, or suspend accounts.</p>
               </div>
 
-              <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900/40">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-mono uppercase text-slate-500">
-                    <tr>
-                      <th className="p-3">User</th>
-                      <th className="p-3">Role</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Exports</th>
-                      <th className="p-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {users.map((u) => (
-                      <tr key={u.uid} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                        <td className="p-3">
-                          <span className="font-semibold text-slate-900 dark:text-white block">{u.displayName}</span>
-                          <span className="text-[11px] font-mono text-slate-500">{u.email}</span>
-                        </td>
-                        <td className="p-3">
-                          <select
-                            value={u.role}
-                            onChange={(e) => handleChangeRole(u.uid, e.target.value)}
-                            className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer"
-                          >
-                            <option value="super_admin">Super Admin</option>
-                            <option value="admin">Admin</option>
-                            <option value="pro">Pro Creator</option>
-                            <option value="user">Free User</option>
-                          </select>
-                        </td>
-                        <td className="p-3">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                              u.status === 'active'
-                                ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                                : 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300'
-                            }`}
-                          >
-                            {u.status === 'active' ? 'Active' : 'Suspended'}
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono">{u.totalExports || 0}</td>
-                        <td className="p-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUserStatus(u.uid, u.status)}
-                            className="px-2.5 py-1 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer transition-colors"
-                          >
-                            {u.status === 'active' ? 'Suspend' : 'Activate'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Search / Filter Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="Filter by name or email..."
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:border-[#E05D26] transition-colors"
+                />
               </div>
+
+              {filteredUsers.length === 0 ? (
+                <EmptyState
+                  icon={<Users className="w-10 h-10" />}
+                  message={users.length === 0 ? 'No users registered yet' : 'No users match your search'}
+                />
+              ) : (
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900/40">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-mono uppercase text-slate-500">
+                      <tr>
+                        <th className="p-3">User</th>
+                        <th className="p-3">Role</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Exports</th>
+                        <th className="p-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {filteredUsers.map((u) => (
+                        <tr key={u.uid} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                          <td className="p-3">
+                            <span className="font-semibold text-slate-900 dark:text-white block">{u.displayName}</span>
+                            <span className="text-[11px] font-mono text-slate-500">{u.email}</span>
+                          </td>
+                          <td className="p-3">
+                            <select
+                              value={u.role}
+                              onChange={(e) => handleChangeRole(u.uid, e.target.value)}
+                              className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer"
+                            >
+                              <option value="super_admin">Super Admin</option>
+                              <option value="admin">Admin</option>
+                              <option value="pro">Pro Creator</option>
+                              <option value="user">Free User</option>
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                u.status === 'active'
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                                  : 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300'
+                              }`}
+                            >
+                              {u.status === 'active' ? 'Active' : 'Suspended'}
+                            </span>
+                          </td>
+                          <td className="p-3 font-mono">{u.totalExports || 0}</td>
+                          <td className="p-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleUserStatus(u.uid, u.status)}
+                              className="px-2.5 py-1 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer transition-colors"
+                            >
+                              {u.status === 'active' ? 'Suspend' : 'Activate'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -682,85 +839,92 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               </div>
 
               {/* Tokens Table */}
-              <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900/40">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-mono uppercase text-slate-500">
-                    <tr>
-                      <th className="p-3">Token & Name</th>
-                      <th className="p-3">Owner</th>
-                      <th className="p-3">Rate Limit</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {tokens.map((t) => {
-                      const isRevealed = Boolean(showTokens[t.token]);
-                      return (
-                        <tr key={t.token} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                          <td className="p-3">
-                            <span className="font-semibold text-slate-900 dark:text-white block">{t.name}</span>
-                            <div className="flex items-center gap-1 font-mono text-[11px] text-slate-500">
-                              <span>{isRevealed ? t.token : `${t.token.slice(0, 12)}••••••••••••`}</span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setShowTokens((prev) => ({ ...prev, [t.token]: !prev[t.token] }))
-                                }
-                                className="p-0.5 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+              {tokens.length === 0 ? (
+                <EmptyState
+                  icon={<Key className="w-10 h-10" />}
+                  message="No agent tokens provisioned yet"
+                />
+              ) : (
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900/40">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-mono uppercase text-slate-500">
+                      <tr>
+                        <th className="p-3">Token & Name</th>
+                        <th className="p-3">Owner</th>
+                        <th className="p-3">Rate Limit</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {tokens.map((t) => {
+                        const isRevealed = Boolean(showTokens[t.token]);
+                        return (
+                          <tr key={t.token} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                            <td className="p-3">
+                              <span className="font-semibold text-slate-900 dark:text-white block">{t.name}</span>
+                              <div className="flex items-center gap-1 font-mono text-[11px] text-slate-500">
+                                <span>{isRevealed ? t.token : `${t.token.slice(0, 12)}••••••••••••`}</span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setShowTokens((prev) => ({ ...prev, [t.token]: !prev[t.token] }))
+                                  }
+                                  className="p-0.5 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                                >
+                                  {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(t.token)}
+                                  className="p-0.5 hover:text-[#E05D26] cursor-pointer"
+                                >
+                                  {copiedToken === t.token ? (
+                                    <Check className="w-3 h-3 text-emerald-500" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </div>
+                            </td>
+                            <td className="p-3 font-mono text-[11px]">{t.userEmail}</td>
+                            <td className="p-3 font-mono text-[11px]">{t.rateLimitPerMin}/min</td>
+                            <td className="p-3">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  t.status === 'active'
+                                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300'
+                                }`}
                               >
-                                {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => copyToClipboard(t.token)}
-                                className="p-0.5 hover:text-[#E05D26] cursor-pointer"
-                              >
-                                {copiedToken === t.token ? (
-                                  <Check className="w-3 h-3 text-emerald-500" />
-                                ) : (
-                                  <Copy className="w-3 h-3" />
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                          <td className="p-3 font-mono text-[11px]">{t.userEmail}</td>
-                          <td className="p-3 font-mono text-[11px]">{t.rateLimitPerMin}/min</td>
-                          <td className="p-3">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                                t.status === 'active'
-                                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                                  : 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300'
-                              }`}
-                            >
-                              {t.status}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right">
-                            {t.status === 'active' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleRevokeToken(t.token)}
-                                className="px-2.5 py-1 rounded text-[11px] font-medium bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 cursor-pointer transition-colors"
-                              >
-                                Revoke
-                              </button>
-                            ) : (
-                              <span className="text-[10px] font-mono text-slate-400">Revoked</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                                {t.status}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              {t.status === 'active' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRevokeToken(t.token)}
+                                  className="px-2.5 py-1 rounded text-[11px] font-medium bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 cursor-pointer transition-colors"
+                                >
+                                  Revoke
+                                </button>
+                              ) : (
+                                <span className="text-[10px] font-mono text-slate-400">Revoked</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
-          {/* TAB 5: ADMIN AUTH HELPER */}
-          {activeTab === 'login' && (
+          {/* TAB 5: ADMIN AUTH HELPER — only visible when !isAdmin */}
+          {activeTab === 'login' && !isAdmin && (
             <div className="max-w-md mx-auto space-y-5 py-4">
               <div className="text-center space-y-1">
                 <div className="w-10 h-10 rounded-xl bg-[#E05D26]/10 text-[#E05D26] mx-auto flex items-center justify-center font-bold">
