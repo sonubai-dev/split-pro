@@ -312,8 +312,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }
   }, [isOpen, fetchAdminData]);
 
-  if (!isOpen) return null;
-
   // Toggle Feature Flag (with Firestore persistence)
   const handleToggleFeature = async (featureKey: string, newValue: boolean) => {
     const updated = { ...features, [featureKey]: newValue };
@@ -475,6 +473,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       ? [{ id: 'login' as AdminTab, label: 'Admin Auth', icon: <Lock className="w-3.5 h-3.5" /> }]
       : []),
   ];
+
+  if (!isOpen) return null;
 
   return (
     <div
