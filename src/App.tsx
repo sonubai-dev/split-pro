@@ -748,6 +748,7 @@ export default function App() {
           onClose={() => setIsAdminModalOpen(false)}
           currentUser={user}
           onSignInEmail={signInWithEmail}
+          onSignOut={logOut}
           onToast={addToast}
         />
 
