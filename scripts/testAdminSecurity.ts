@@ -9,7 +9,7 @@
  */
 
 const BASE_URL = 'http://localhost:3002';
-const ADMIN_EMAIL = 'ssdd747346@gmail.com';
+const ADMIN_EMAIL = 'admin@vistaro.internal';
 
 async function testAdminSecurity() {
   console.log('====================================================');
@@ -33,7 +33,7 @@ async function testAdminSecurity() {
 
   // Test 2: Input Validation - Reject Invalid User Role
   console.log('\n[Test 2] Testing Input Validation: Reject Malformed User Role...');
-  const resBadRole = await fetch(`${BASE_URL}/api/v1/admin/users/admin_ssdd747346/role`, {
+  const resBadRole = await fetch(`${BASE_URL}/api/v1/admin/users/usr_test_admin/role`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -50,7 +50,7 @@ async function testAdminSecurity() {
 
   // Test 3: Input Validation - Reject Invalid User Status
   console.log('\n[Test 3] Testing Input Validation: Reject Malformed User Status...');
-  const resBadStatus = await fetch(`${BASE_URL}/api/v1/admin/users/admin_ssdd747346/status`, {
+  const resBadStatus = await fetch(`${BASE_URL}/api/v1/admin/users/usr_test_admin/status`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
