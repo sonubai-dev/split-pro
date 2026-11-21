@@ -186,8 +186,110 @@ export function getSeamlessPanoramaSample(): { url: string; name: string } {
     </text>
   </svg>`;
 
-  return {
+    return {
     name: 'Seamless_Panorama_3x1_Carousel.svg',
+    url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+  };
+}
+
+export function getWebtoonStripSample(): { url: string; name: string } {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 3200" width="1200" height="3200">
+    <defs>
+      <linearGradient id="panelGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#0f172a"/>
+        <stop offset="100%" stop-color="#1e293b"/>
+      </linearGradient>
+      <linearGradient id="panelGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#3b0764"/>
+        <stop offset="100%" stop-color="#1e1b4b"/>
+      </linearGradient>
+      <linearGradient id="panelGrad3" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#064e3b"/>
+        <stop offset="100%" stop-color="#022c22"/>
+      </linearGradient>
+      <linearGradient id="panelGrad4" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#7c2d12"/>
+        <stop offset="100%" stop-color="#451a03"/>
+      </linearGradient>
+    </defs>
+
+    <rect width="1200" height="3200" fill="#090d16"/>
+
+    <!-- Panel 1: Prologue -->
+    <rect x="40" y="40" width="1120" height="720" rx="16" fill="url(#panelGrad1)" stroke="#334155" stroke-width="4"/>
+    <text x="600" y="340" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="44" font-weight="900" text-anchor="middle">
+      EPISODE 01: THE AWAKENING
+    </text>
+    <text x="600" y="420" fill="#94a3b8" font-family="monospace" font-size="24" text-anchor="middle">
+      Panel 01 • Vertical Webtoon Reader (800 × 1280)
+    </text>
+
+    <!-- Panel 2: Action Impact -->
+    <rect x="40" y="840" width="1120" height="720" rx="16" fill="url(#panelGrad2)" stroke="#334155" stroke-width="4"/>
+    <circle cx="600" cy="1160" r="140" fill="#ec4899" opacity="0.3"/>
+    <text x="600" y="1180" fill="#f43f5e" font-family="system-ui, sans-serif" font-size="56" font-weight="900" text-anchor="middle">
+      💥 IMPACT STRIKE!
+    </text>
+    <text x="600" y="1250" fill="#cbd5e1" font-family="monospace" font-size="22" text-anchor="middle">
+      Auto-detected gutter at Y: 800px
+    </text>
+
+    <!-- Panel 3: Dialogue Encounter -->
+    <rect x="40" y="1640" width="1120" height="720" rx="16" fill="url(#panelGrad3)" stroke="#334155" stroke-width="4"/>
+    <text x="600" y="1960" fill="#34d399" font-family="system-ui, sans-serif" font-size="44" font-weight="800" text-anchor="middle">
+      "THE ENERGY GRID IS UNSTABLE"
+    </text>
+    <text x="600" y="2030" fill="#a7f3d0" font-family="monospace" font-size="22" text-anchor="middle">
+      Panel 03 • Lossless Gutter Separation
+    </text>
+
+    <!-- Panel 4: Cliffhanger -->
+    <rect x="40" y="2440" width="1120" height="720" rx="16" fill="url(#panelGrad4)" stroke="#334155" stroke-width="4"/>
+    <text x="600" y="2780" fill="#fb923c" font-family="system-ui, sans-serif" font-size="52" font-weight="900" text-anchor="middle">
+      TO BE CONTINUED...
+    </text>
+    <text x="600" y="2850" fill="#fdba74" font-family="monospace" font-size="22" text-anchor="middle">
+      Panel 04 • Single-Click Batch ZIP Export
+    </text>
+  </svg>`;
+
+  return {
+    name: 'Webtoon_Comic_Vertical_Strip.svg',
+    url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+  };
+}
+
+export function getProfileGridSample(): { url: string; name: string } {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3240 3240" width="3240" height="3240">
+    <defs>
+      <linearGradient id="mosaicGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#0f172a"/>
+        <stop offset="50%" stop-color="#1e293b"/>
+        <stop offset="100%" stop-color="#0b0f19"/>
+      </linearGradient>
+    </defs>
+    <rect width="3240" height="3240" fill="url(#mosaicGrad)"/>
+    <circle cx="1620" cy="1620" r="1000" fill="#f59e0b" opacity="0.15"/>
+    <circle cx="1620" cy="1620" r="600" fill="#ea580c" opacity="0.25"/>
+    
+    <!-- 3x3 Grid Guides -->
+    <line x1="1080" y1="0" x2="1080" y2="3240" stroke="#f97316" stroke-width="8" stroke-dasharray="24,24"/>
+    <line x1="2160" y1="0" x2="2160" y2="3240" stroke="#f97316" stroke-width="8" stroke-dasharray="24,24"/>
+    <line x1="0" y1="1080" x2="3240" y2="1080" stroke="#f97316" stroke-width="8" stroke-dasharray="24,24"/>
+    <line x1="0" y1="2160" x2="3240" y2="2160" stroke="#f97316" stroke-width="8" stroke-dasharray="24,24"/>
+
+    <!-- Center Brand Badge -->
+    <rect x="800" y="1400" width="1640" height="440" rx="32" fill="#000000" fill-opacity="0.75" stroke="#ffffff" stroke-width="4"/>
+    <text x="1620" y="1600" fill="#ffffff" font-family="system-ui, sans-serif" font-size="80" font-weight="900" text-anchor="middle">
+      INSTAGRAM 3×3 PROFILE MOSAIC
+    </text>
+    <text x="1620" y="1720" fill="#fb923c" font-family="monospace" font-size="40" text-anchor="middle">
+      9 Tiles • 1080×1080px Each • Perfect Feed Grid
+    </text>
+  </svg>`;
+
+  return {
+    name: 'Instagram_3x3_Profile_Mosaic.svg',
     url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
   };
 }

@@ -12,7 +12,7 @@ const app = express();
 const PORT = parseInt(process.env.PORT || process.env.VISTARO_REMOTE_PORT || '3002', 10);
 const API_KEY = process.env.VISTARO_API_KEY;
 const ADMIN_SECRET = process.env.VISTARO_ADMIN_SECRET || '__vistaro_dev_secret_do_not_use_in_prod__';
-const ADMIN_EMAIL = process.env.VISTARO_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'ssdd747346@gmail.com';
+const ADMIN_EMAIL = process.env.VISTARO_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@vistaro.local';
 
 // Max clock skew allowed for HMAC timestamp validation (5 minutes)
 const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000;
@@ -609,7 +609,7 @@ app.post('/api/v1/admin/tokens/generate', adminAuthMiddleware, (req: Request, re
   const newToken: ManagedToken = {
     token: `vst_live_${secureHex}`,
     name: name || 'Admin Generated Token',
-    userId: 'admin_ssdd747346',
+    userId: 'admin_master',
     userEmail: userEmail || ADMIN_EMAIL,
     createdAt: new Date().toISOString(),
     status: 'active',

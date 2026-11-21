@@ -50,7 +50,7 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 // Firestore is used exclusively for lightweight user profile metadata and preferences.
 export const db = getFirestore(app);
 
-export const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'ssdd747346@gmail.com';
+export const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL || '';
 
 /**
  * Check if a given user is the system Super Admin
