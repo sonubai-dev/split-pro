@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { subscribeMcpBridgeStatus } from '../agent/tools';
 import { isUserSuperAdmin } from '../lib/firebase';
+import { usePwa } from '../lib/pwa';
 import {
   Scissors,
   Moon,
@@ -70,6 +71,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMcpBridgeLive, setIsMcpBridgeLive] = useState(false);
+  const { canInstall, promptInstall } = usePwa();
 
   useEffect(() => {
     return subscribeMcpBridgeStatus((live) => setIsMcpBridgeLive(live));
@@ -203,6 +205,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 </button>
               )}
             </>
+          )}
+
+          {/* PWA Install Trigger (Desktop Header) */}
+          {canInstall && (
+            <button
+              id="btn-header-install-app"
+              type="button"
+              onClick={promptInstall}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-[#E05D26] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all cursor-pointer shadow-2xs active:scale-95"
+              title="Install Vistaro to your desktop or device"
+            >
+              <Download className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Install App</span>
+            </button>
           )}
 
           {currentView === 'home' && onNavigate && (
@@ -353,6 +369,19 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       {/* Mobile Navigation Dropdown */}
       {isMobileMenuOpen && onNavigate && (
         <div className="md:hidden border-t border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#0B0E14]/95 backdrop-blur-md px-4 py-3 space-y-1 animate-in fade-in slide-in-from-top-1 shadow-lg">
+          {canInstall && (
+            <button
+              type="button"
+              onClick={() => {
+                promptInstall();
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-white bg-[#E05D26] hover:bg-[#C94E1B] transition-all cursor-pointer shadow-xs mb-2"
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              <span>Install Vistaro to Home Screen</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {

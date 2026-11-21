@@ -3,6 +3,7 @@ import { Scissors, PlusCircle } from 'lucide-react';
 import { AppHeader } from './components/AppHeader';
 import { LandingPage } from './components/LandingPage';
 import { ToastContainer } from './components/ToastContainer';
+import { PwaUpdateToast } from './components/PwaUpdateToast';
 
 // Lazy-loaded Views and Modals to reduce initial bundle from 2.2MB to < 180kB
 const Dashboard = lazy(() => import('./components/Dashboard').then((m) => ({ default: m.Dashboard })));
@@ -36,7 +37,7 @@ const AdminPanelModal = lazy(() =>
 const ViewLoadingFallback: React.FC = () => (
   <div className="flex-1 flex items-center justify-center min-h-[60vh] bg-white dark:bg-[#0B0F17]">
     <div className="flex flex-col items-center gap-3">
-      <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="w-8 h-8 border-2 border-[#E05D26] border-t-transparent rounded-full animate-spin"></div>
       <span className="text-xs font-mono text-slate-500 dark:text-slate-400">Loading Studio View...</span>
     </div>
   </div>
@@ -774,6 +775,10 @@ export default function App() {
           onDecline={handleDeclineAgentExport}
           isExporting={isExporting}
         />
+
+        {/* Global Toast Notifications & PWA Update Notice */}
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
+        <PwaUpdateToast />
       </Suspense>
     </div>
   );

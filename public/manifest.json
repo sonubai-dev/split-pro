@@ -1,0 +1,62 @@
+{
+  "name": "VistaroAI Studio — Precision Slicer & Carousel Maker",
+  "short_name": "Vistaro",
+  "description": "Turn wide images into seamless Instagram carousels, slice webtoons, and create 4K motion videos 100% in-browser.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#0B0E14",
+  "theme_color": "#E05D26",
+  "orientation": "any",
+  "categories": ["photo", "productivity", "graphics", "entertainment"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open Storyboard Slicer",
+      "short_name": "Slicer",
+      "description": "Launch the in-browser image slicer and carousel maker",
+      "url": "/?view=slicer",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Motion Video Studio",
+      "short_name": "Motion Studio",
+      "description": "Create 60 FPS Ken Burns 4K motion videos with music",
+      "url": "/?view=video",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

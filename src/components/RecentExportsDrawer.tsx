@@ -1,6 +1,7 @@
 import React from 'react';
-import { X, Archive, Clock, Trash2, Download } from 'lucide-react';
+import { X, Archive, Clock, Trash2, Download, Smartphone } from 'lucide-react';
 import { RecentExport } from '../hooks/useRecentExports';
+import { usePwa } from '../lib/pwa';
 
 interface RecentExportsDrawerProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ export const RecentExportsDrawer: React.FC<RecentExportsDrawerProps> = ({
   recentExports,
   onClear,
 }) => {
+  const { canInstall, promptInstall } = usePwa();
+
   return (
     <>
       {/* Backdrop */}
@@ -27,7 +30,7 @@ export const RecentExportsDrawer: React.FC<RecentExportsDrawerProps> = ({
       <div className={`fixed inset-y-0 right-0 w-80 sm:w-96 bg-white dark:bg-[#111827] shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out border-l border-gray-200 dark:border-[#1F2937] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-[#1F2937]">
           <div className="flex items-center gap-2">
-            <Archive className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <Archive className="w-5 h-5 text-[#E05D26]" />
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Recent Exports</h2>
           </div>
           <button
@@ -39,6 +42,28 @@ export const RecentExportsDrawer: React.FC<RecentExportsDrawerProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
+          {/* Celebratory PWA Install Invitation Chip */}
+          {canInstall && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2.5">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-[#E05D26]" />
+                  <span>Install Vistaro App</span>
+                </p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                  Slice carousels and create videos 100% offline
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={promptInstall}
+                className="px-3 py-1.5 rounded-lg bg-[#E05D26] hover:bg-[#C94E1B] text-white text-xs font-bold shrink-0 shadow-2xs active:scale-95 transition-all cursor-pointer"
+              >
+                Install
+              </button>
+            </div>
+          )}
+
           {recentExports.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-4 space-y-3">
               <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-[#1F2937] flex items-center justify-center text-gray-400 dark:text-gray-500">
@@ -58,7 +83,7 @@ export const RecentExportsDrawer: React.FC<RecentExportsDrawerProps> = ({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2 min-w-0">
-                      <div className="p-1.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 shrink-0">
+                      <div className="p-1.5 rounded bg-amber-500/10 text-[#E05D26] shrink-0">
                         <Download className="w-3.5 h-3.5" />
                       </div>
                       <div className="flex flex-col min-w-0">
